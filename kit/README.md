@@ -78,8 +78,30 @@ Import 3 file trong `n8n/`. Biến môi trường cần đặt trong n8n:
 Sửa đường dẫn `executeCommand` cho khớp máy chủ (mặc định `/opt/digiads/kit` và
 `/opt/MediaCrawler/data`).
 
+## Các module v2 (Tier 1 + Tier 2 — đã có)
+
+| Module | Dùng khi | Lệnh/API |
+|---|---|---|
+| `enrich/` | Chuẩn hoá dữ liệu thô, velocity WoW, dịch ZH→VI | `from kit.enrich import normalize, weekly_velocity, translate_zh_vi` |
+| `storage/schema/` | Tạo kho Supabase (1 lần) | chạy `001` → `002` → `003` (xem `storage/README.md`) |
+| `storage/supabase_writer.py` | Ghi kết quả analyzer lên Supabase | thêm cờ `--to supabase` (thử trước: `--dry-run`) |
+| `storage/checkpoint.py` | Crawl tăng dần — lần 2 chỉ xử lý post mới | option `incremental` trong job queue |
+| `pipeline/angle_to_brief.py` | Angle → Video Brief JSON cho AI video | `python kit/pipeline/angle_to_brief.py <angle.jsonl> --product "..." [--provider mock]` |
+| `webhook/emit.py` | Bắn event sang n8n sau khi phân tích | thêm cờ `--notify` |
+| `queue/` | Chạy nhiều ngách theo hàng đợi (cần Redis) | `arq kit.queue.worker.WorkerSettings` + `python kit/queue/enqueue.py dy search "kw" --analyze trend` |
+| REST `/kit/*` | Gọi kit qua HTTP | `POST /kit/analyze`, `GET /kit/reports/{name}`, `POST /kit/angle-brief` |
+
+Ví dụ chuỗi đầy đủ Tier 1:
+
+```bash
+python kit/analyzer/mediacrawler_analyzer.py angle data/douyin/search_x.xlsx --to supabase
+python kit/pipeline/angle_to_brief.py reports/angle_library.jsonl \
+    --product "Serum kiềm dầu 199k, TikTok Shop" --notify
+```
+
 ## Lộ trình nâng cấp
 
-Tier 1 (làm ngay, rủi ro thấp): ghi Supabase + enrichment + webhook n8n.
-Tier 2: hàng đợi arq + crawl tăng dần + lịch tự động.
-Tier 3 (cẩn trọng pháp lý): multi-account + proxy rotation.
+Tier 1 (đã có): ghi Supabase + enrichment + webhook n8n.
+Tier 2 (đã có): hàng đợi arq + crawl tăng dần checkpoint.
+Tier 3 (KHOÁ — cẩn trọng pháp lý): multi-account + proxy rotation, chỉ mở khi có
+ghi chú "đã rà soát pháp lý" trong CLAUDE.md.
