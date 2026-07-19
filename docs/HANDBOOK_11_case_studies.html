@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>DigiAds · Sổ tay triển khai 11 Case Study — MediaCrawler</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#0A0E1F;--ink2:#0E1428;--panel:#141B34;--panel2:#1B2445;
+    --line:rgba(255,255,255,.08);--line2:rgba(255,255,255,.14);
+    --text:#EAECF6;--muted:#98A0C2;--dim:#616A90;
+    --signal:#FF7A4D;--violet:#8B7BFF;--mint:#43D9A3;--amber:#F6C453;
+    --mono:"JetBrains Mono",ui-monospace,monospace;--disp:"Space Grotesk",sans-serif;--body:"Inter",sans-serif;
+  }
+  *{box-sizing:border-box}html{scroll-behavior:smooth}
+  body{margin:0;background:radial-gradient(900px 500px at 85% -10%,rgba(139,123,255,.12),transparent 60%),var(--ink);
+    color:var(--text);font-family:var(--body);line-height:1.6;-webkit-font-smoothing:antialiased}
+  h1,h2,h3,h4{font-family:var(--disp);margin:0;line-height:1.15}
+  a{color:var(--signal);text-decoration:none}
+  .wrap{max-width:1120px;margin:0 auto;padding:0 22px}
+  .mono{font-family:var(--mono)}.muted{color:var(--muted)}.dim{color:var(--dim)}
+
+  header.top{border-bottom:1px solid var(--line);padding:56px 0 40px;position:relative;overflow:hidden}
+  .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.3em;text-transform:uppercase;color:var(--signal)}
+  h1{font-size:clamp(30px,5vw,50px);font-weight:700;letter-spacing:-1px;margin:16px 0 0}
+  h1 .hl{color:var(--signal)}
+  .sub{color:var(--muted);max-width:680px;margin:16px 0 0;font-size:16px}
+
+  /* kit map */
+  .kit{margin-top:30px;background:#070A16;border:1px solid var(--line2);border-radius:14px;padding:18px 20px;font-family:var(--mono);font-size:12.5px;color:#cdd4f0;line-height:1.9;overflow-x:auto}
+  .kit .d{color:var(--violet)}.kit .c{color:var(--dim)}.kit .f{color:var(--mint)}
+
+  /* nav */
+  nav.jump{position:sticky;top:0;z-index:20;background:rgba(10,14,31,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);padding:12px 0}
+  .jump-row{display:flex;gap:8px;flex-wrap:wrap}
+  .jump a{font-family:var(--mono);font-size:11px;color:var(--muted);border:1px solid var(--line2);border-radius:7px;padding:5px 9px}
+  .jump a:hover{color:var(--signal);border-color:var(--signal)}
+
+  section.cs{padding:40px 0;border-bottom:1px solid var(--line)}
+  .cs-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap}
+  .cs-id{font-family:var(--mono);font-size:12px;color:var(--violet);letter-spacing:.18em}
+  .cs-title{font-size:26px;margin:6px 0 0;letter-spacing:-.4px}
+  .cs-meta{display:flex;gap:7px;flex-wrap:wrap;margin-top:12px}
+  .m{font-family:var(--mono);font-size:10.5px;padding:4px 9px;border-radius:6px;border:1px solid var(--line2);color:var(--muted)}
+  .m.line{color:var(--mint);border-color:rgba(67,217,163,.35)}
+  .m.cad{color:var(--amber);border-color:rgba(246,196,83,.35)}
+
+  .blk{margin-top:20px}
+  .lab{font-family:var(--mono);font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--signal);display:flex;align-items:center;gap:8px;margin-bottom:8px}
+  .lab::before{content:"";width:16px;height:1px;background:var(--signal)}
+  .cs p{margin:0 0 10px;font-size:14.5px}.cs p.strat{color:var(--text)}
+  .cs .steps{counter-reset:s;list-style:none;margin:0;padding:0}
+  .cs .steps li{counter-increment:s;position:relative;padding:7px 0 7px 34px;font-size:14px;color:var(--muted);border-bottom:1px solid rgba(255,255,255,.05)}
+  .cs .steps li b{color:var(--text)}
+  .cs .steps li::before{content:counter(s);position:absolute;left:0;top:6px;width:22px;height:22px;border-radius:6px;background:var(--panel2);border:1px solid var(--line2);color:var(--signal);font-family:var(--mono);font-size:11px;font-weight:700;display:grid;place-items:center}
+
+  .term{background:#070A16;border:1px solid var(--line2);border-radius:10px;overflow:hidden}
+  .term-bar{display:flex;align-items:center;gap:6px;padding:8px 12px;border-bottom:1px solid var(--line)}
+  .term-bar i{width:9px;height:9px;border-radius:50%;background:#2c3350;display:block}
+  .term-bar .t{margin-left:6px;font-family:var(--mono);font-size:10.5px;color:var(--dim)}
+  pre{margin:0;padding:13px 15px;overflow-x:auto;font-family:var(--mono);font-size:12px;line-height:1.7;color:#cdd4f0}
+  pre .c{color:#5f6b96}pre .f{color:var(--signal)}pre .s{color:var(--mint)}pre .k{color:var(--violet)}pre .n{color:var(--amber)}
+
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:760px){.two{grid-template-columns:1fr}}
+  .pill{display:inline-flex;gap:7px;align-items:center;font-family:var(--mono);font-size:11.5px;background:var(--panel);border:1px solid var(--line2);border-radius:8px;padding:7px 11px;color:var(--text)}
+  .pill .k{color:var(--amber)}
+  .out{background:linear-gradient(180deg,rgba(67,217,163,.08),transparent);border:1px solid rgba(67,217,163,.28);border-radius:10px;padding:12px 15px;font-size:13.5px;color:var(--muted)}
+  .out b{color:var(--mint)}
+  .n8n{background:linear-gradient(180deg,rgba(139,123,255,.08),transparent);border:1px solid rgba(139,123,255,.28);border-radius:10px;padding:12px 15px;font-size:13.5px;color:var(--muted)}
+  .n8n b{color:var(--violet)}
+
+  .road{padding:48px 0}
+  table{width:100%;border-collapse:collapse;font-size:13px;margin-top:10px}
+  th,td{text-align:left;padding:9px 11px;border-bottom:1px solid var(--line)}
+  th{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.14em;color:var(--dim)}
+  td code{font-family:var(--mono);font-size:11.5px;color:var(--amber)}
+  .tier{font-family:var(--mono);font-size:10.5px;padding:3px 8px;border-radius:100px;white-space:nowrap}
+  .t1{background:rgba(67,217,163,.15);color:var(--mint)}.t2{background:rgba(246,196,83,.15);color:var(--amber)}.t3{background:rgba(255,122,77,.15);color:var(--signal)}
+  footer{padding:36px 0 60px;color:var(--dim);font-size:13px}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <div class="eyebrow">DigiAds Media Lab · Implementation Handbook v1</div>
+    <h1>Sổ tay triển khai <span class="hl">11 Case Study</span></h1>
+    <p class="sub">Mỗi case: tư duy chiến lược gốc · quy trình vận hành · cấu hình crawl · code/analyzer · luồng n8n · mẫu báo cáo output. Toàn bộ tài nguyên đóng gói trong bộ kit đi kèm.</p>
+    <div class="kit">
+<span class="c"># Cấu trúc bộ kit (giải nén vào /opt/digiads/kit)</span>
+kit/
+├── <span class="d">analyzer/</span>  <span class="f">mediacrawler_analyzer.py</span>   <span class="c"># 1 file, phục vụ cả 11 case</span>
+├── <span class="d">prompts/</span>   <span class="f">angle_to_video_prompts.py</span>  <span class="c"># nối Angle Library → AI video</span>
+├── <span class="d">mcp/</span>       <span class="f">mcp_mediacrawler.py</span>        <span class="c"># cho AI agent gọi crawler</span>
+├── <span class="d">n8n/</span>       WF_MC1_trend · WF_MC2_sov · WF_MC3_koc  <span class="c"># 3 luồng tự động</span>
+└── <span class="d">templates/</span> TREND_BRIEF · INSIGHT_BANK · KOC_SCORECARD · OPPORTUNITY_MAP · SOV_DASHBOARD
+    </div>
+  </div>
+</header>
+
+<nav class="jump"><div class="wrap"><div class="jump-row">
+  <a href="#cs1">01 Trend Radar</a><a href="#cs2">02 Voice of Customer</a><a href="#cs3">03 KOC Vetting</a>
+  <a href="#cs4">04 Product/Angle</a><a href="#cs5">05 Angle Library</a><a href="#cs6">06 Saturation Map</a>
+  <a href="#cs7">07 Seasonal</a><a href="#cs8">08 Price Intel</a><a href="#cs9">09 Rising KOC</a>
+  <a href="#cs10">10 Sound Watchlist</a><a href="#cs11">11 Share of Voice</a><a href="#road">→ Roadmap</a>
+</div></div></nav>
+
+<!-- ================= CS1 ================= -->
+<section class="cs" id="cs1"><div class="wrap">
+  <div class="cs-head"><div>
+    <div class="cs-id">CASE 01</div><h2 class="cs-title">Trend Radar xuyên biên giới</h2>
+  </div><div class="cs-meta"><span class="m line">Media/Content · MCN</span><span class="m cad">Định kỳ · tuần</span><span class="m">search</span></div></div>
+
+  <div class="blk"><div class="lab">Tư duy chiến lược gốc</div>
+    <p class="strat">Lợi thế của agency không nằm ở việc làm content đẹp hơn, mà ở việc <b>biết trước</b>. Douyin/Xiaohongshu đi trước thị trường VN 2–6 tháng. Ai đọc được format &amp; nhạc đang lên ở nguồn và bản địa hoá sớm sẽ ăn trọn cửa sổ chưa bão hoà — đặc biệt khi anh có sẵn kho phim ngắn AI từ đối tác Hàng Châu để sản xuất nhanh.</p></div>
+
+  <div class="blk"><div class="lab">Quy trình hoạt động</div>
+    <ol class="steps">
+      <li>Xác định 3–5 cụm từ khoá theo ngành hàng khách đang chạy.</li>
+      <li>Chạy crawl <b>search</b> trên Douyin + XHS, giới hạn ~200 bài, bật comment nhẹ.</li>
+      <li>Chạy <b>analyzer trend</b> → chấm điểm (save 40% + share 30% + like 30%) và xếp hạng format.</li>
+      <li>Người phụ trách chọn 10 format + hook mẫu, gắn nhạc trending, viết <b>Trend Brief</b>.</li>
+      <li>Giao team content/KOC bản địa hoá; đưa top angle vào Angle Library (CS5).</li>
+    </ol></div>
+
+  <div class="two">
+    <div class="blk"><div class="lab">Cấu hình crawl</div>
+      <div class="term"><div class="term-bar"><i></i><i></i><i></i><span class="t">crawl</span></div>
+<pre>uv run main.py <span class="f">--platform</span> <span class="s">dy</span> <span class="f">--type</span> <span class="s">search</span> \
+  <span class="f">--keywords</span> <span class="s">"护肤教程,穿搭,好物分享"</span> \
+  <span class="f">--get_comment</span> <span class="s">yes</span> \
+  <span class="f">--crawler_max_notes_count</span> <span class="n">200</span> \
+  <span class="f">--save_data_option</span> <span class="s">excel</span></pre></div></div>
+    <div class="blk"><div class="lab">Analyzer / code</div>
+      <div class="term"><div class="term-bar"><i></i><i></i><i></i><span class="t">analyze</span></div>
+<pre><span class="c"># hàm: trend_radar() — xuất 3 file</span>
+python3 mediacrawler_analyzer.py <span class="s">trend</span> \
+  data/douyin/search_*.xlsx</pre></div>
+      <p class="dim" style="font-size:12.5px;margin-top:8px">Xuất: top_posts · formats · sound_watchlist.</p></div>
+  </div>
+
+  <div class="two" style="margin-top:16px">
+    <div class="n8n"><b>n8n:</b> WF-MC1 chạy tự động thứ 2 hàng tuần → crawl → analyzer → Claude viết brief → gửi team qua webhook Zalo/Slack.</div>
+    <div class="out"><b>Output:</b> <span class="mono">TREND_BRIEF_sample.xlsx</span> (10 format + điểm trend tự tính + sheet Sound Watchlist).</div>
+  </div>
+</div></section>
+
+<!-- ================= CS2 ================= -->
+<section class="cs" id="cs2"><div class="wrap">
+  <div class="cs-head"><div>
+    <div class="cs-id">CASE 02</div><h2 class="cs-title">Voice of Customer — đào insight từ comment</h2>
+  </div><div class="cs-meta"><span class="m line">Paid Ads · Content</span><span class="m cad">Theo chiến dịch</span><span class="m">detail</span></div></div>
+
+  <div class="blk"><div class="lab">Tư duy chiến lược gốc</div>
+    <p class="strat">Content bán được hàng không đến từ trí tưởng tượng của copywriter, mà từ <b>chính ngôn ngữ khách hàng</b>. Bình luận dưới video viral là nơi khách tự thú nỗi đau, phản đối và mong muốn bằng từ ngữ của họ. Bê nguyên ngôn ngữ đó vào hook &amp; ad copy → tăng cộng hưởng và chuyển đổi.</p></div>
+
+  <div class="blk"><div class="lab">Quy trình hoạt động</div>
+    <ol class="steps">
+      <li>Chọn 5–15 post/video viral đúng ngành → lấy ID.</li>
+      <li>Crawl <b>detail</b> + comment 2 tầng, lưu <b>jsonl</b> (tự sinh word cloud).</li>
+      <li><b>analyzer insight</b> lọc rác/dedupe → comment bank gọn.</li>
+      <li>Nạp comment bank vào Claude phân cụm: pain · phản đối · từ vựng · câu hỏi lặp.</li>
+      <li>Đổ kết quả vào Insight &amp; Objection Bank → dùng cho script &amp; ad copy.</li>
+    </ol></div>
+
+  <div class="two">
+    <div class="blk"><div class="lab">Cấu hình crawl</div>
+      <div class="term"><div class="term-bar"><i></i><i></i><i></i><span class="t">crawl</span></div>
+<pre>uv run main.py <span class="f">--platform</span> <span class="s">dy</span> <span class="f">--type</span> <span class="s">detail</span> \
+  <span class="f">--specified_id</span> <span class="s">"7480…,7492…"</span> \
+  <span class="f">--get_comment</span> <span class="s">yes</span> <span class="f">--get_sub_comment</span> <span class="s">yes</span> \
+  <span class="f">--max_comments_count_singlenotes</span> <span class="n">500</span> \
+  <span class="f">--save_data_option</span> <span class="s">jsonl</span></pre></div></div>
+    <div class="blk"><div class="lab">Analyzer / code</div>
+      <div class="term"><div class="term-bar"><i></i><i></i><i></i><span class="t">analyze</span></div>
+<pre><span class="c"># comment_bank() -> lọc & xếp theo like</span>
+python3 mediacrawler_analyzer.py <span class="s">insight</span> \
+  data/douyin/detail_*.jsonl
+<span class="c"># rồi nạp prompt phân cụm (prompts/)</span></pre></div></div>
+  </div>
+
+  <div class="out" style="margin-top:16px"><b>Output:</b> <span class="mono">INSIGHT_BANK_sample.xlsx</span> — 3 sheet: Pain Points (quote nguyên văn + % + hook đề xuất), Objections (cách xử lý trong script), Vocab (từ khách hay dùng).</div>
+</div></section>
+
+<!-- ================= CS3 ================= -->
+<section class="cs" id="cs3"><div class="wrap">
+  <div class="cs-head"><div>
+    <div class="cs-id">CASE 03</div><h2 class="cs-title">Thẩm định KOC &amp; soi đối thủ</h2>
+  </div><div class="cs-meta"><span class="m line">MCN / KOC</span><span class="m cad">Trước mỗi hợp đồng</span><span class="m">creator</span></div></div>
+
+  <div class="blk"><div class="lab">Tư duy chiến lược gốc</div>
+    <p class="strat">Rủi ro lớn nhất khi ký KOC là trả tiền cho <b>ăn may một hit</b>. Một KOC tốt là người tương tác <b>đều</b> qua nhiều video, không phải một video triệu view rồi im. Đo độ đều (không chỉ đỉnh cao) giúp định giá booking đúng và giảm rủi ro chiến dịch.</p></div>
+
+  <div class="blk"><div class="lab">Quy trình hoạt động</div>
+    <ol class="steps">
+      <li>Lấy creator_id của các KOC ứng viên (và creator đối thủ để benchmark).</li>
+      <li>Crawl <b>creator</b> để lấy toàn bộ lịch sử content + tương tác.</li>
+      <li><b>analyzer koc</b> tính engagement TB, độ đều (1/(1+CV)), velocity, nhịp đăng.</li>
+      <li>Đọc scorecard → verdict Ký ngay / Theo dõi / Bỏ qua; định giá theo điểm.</li>
+    </ol></div>
+
+  <div class="two">
+    <div class="blk"><div class="lab">Cấu hình crawl</div>
+      <div class="term"><div class="term-bar"><i></i><i></i><i></i><span class="t">crawl</span></div>
+<pre>uv run main.py <span class="f">--platform</span> <span class="s">dy</span> <span class="f">--type</span> <span class="s">creator</span> \
+  <span class="f">--creator_id</span> <span class="s">"MS4wLjA…,MS4wLjB…"</span> \
+  <span class="f">--get_comment</span> <span class="s">yes</span> <span class="f">--save_data_option</span> <span class="s">excel</span></pre></div></div>
+    <div class="blk"><div class="lab">Analyzer / code</div>
+      <div class="term"><div class="term-bar"><i></i><i></i><i></i><span class="t">analyze</span></div>
+<pre><span class="c"># koc_scorecard() -> điểm + verdict</span>
+python3 mediacrawler_analyzer.py <span class="s">koc</span> \
+  data/douyin/creator_*.xlsx</pre></div></div>
+  </div>
+
+  <div class="out" style="margin-top:16px"><b>Output:</b> <span class="mono">KOC_SCORECARD_sample.xlsx</span> — điểm tổng &amp; verdict tự tính (40% eng + 35% độ đều + 25% velocity), có cột giá đề xuất/clip.</div>
+</div></section>
+
+<!-- ================= CS4 ================= -->
+<section class="cs" id="cs4"><div class="wrap">
+  <div class="cs-head"><div>
+    <div class="cs-id">CASE 04</div><h2 class="cs-title">Săn sản phẩm &amp; góc bán thắng</h2>
+  </div><div class="cs-meta"><span class="m line">E-commerce / TSP</span><span class="m cad">Trước mỗi đợt hàng</span><span class="m">search</span></div></div>
+
+  <div class="blk"><div class="lab">Tư duy chiến lược gốc</div>
+    <p class="strat">Trên TikTok Shop, thắng thua nằm ở <b>chọn đúng sản phẩm + đúng góc bán</b> trước khi quay. Xiaohongshu là kho “种草” (giới thiệu sản phẩm) khổng lồ đã được thị trường kiểm chứng. Đọc nội dung save cao + comment thất vọng của đối thủ = tìm được sản phẩm có cầu và góc bán đã validate.</p></div>
+
+  <div class="blk"><div class="lab">Quy trình hoạt động</div>
+    <ol class="steps">
+      <li>Crawl <b>search</b> XHS theo từ khoá mua sắm ("测评", "回购", "踩雷") + comment.</li>
+      <li>Chạy <b>analyzer opportunity</b> để xếp sản phẩm/ngách theo cầu (save) vs cạnh tranh.</li>
+      <li>Trích góc bán lặp lại trong desc/comment; gom lỗi đối thủ từ comment "踩雷".</li>
+      <li>Chốt shortlist sản phẩm + playbook góc bán cho gian hàng &amp; brief KOC/affiliate.</li>
+    </ol></div>
+
+  <div class="two">
+    <div class="blk"><div class="lab">Cấu hình crawl</div>
+      <div class="term"><div class="term-bar"><i></i><i></i><i></i><span class="t">crawl</span></div>
+<pre>uv run main.py <span class="f">--platform</span> <span class="s">xhs</span> <span class="f">--type</span> <span class="s">search</span> \
+  <span class="f">--keywords</span> <span class="s">"平价好物,测评,踩雷,回购"</span> \
+  <span class="f">--get_comment</span> <span class="s">yes</span> \
+  <span class="f">--crawler_max_notes_count</span> <span class="n">300</span> <span class="f">--save_data_option</span> <span class="s">excel</span></pre></div></div>
+    <div class="blk"><div class="lab">Analyzer / code</div>
+      <div class="term"><div class="term-bar"><i></i><i></i><i></i><span class="t">analyze</span></div>
+<pre><span class="c"># opportunity_map() + price_intel()</span>
+python3 mediacrawler_analyzer.py <span class="s">opportunity</span> f.xlsx
+python3 mediacrawler_analyzer.py <span class="s">price</span> f.xlsx</pre></div></div>
+  </div>
+
+  <div class="out" style="margin-top:16px"><b>Output:</b> <span class="mono">OPPORTUNITY_MAP_sample.xlsx</span> — sheet Niche Map (quadrant biển xanh/cạnh tranh/bão hoà) + sheet Price Intel.</div>
+</div></section>
+
+<!-- ================= CS5 ================= -->
+<section class="cs" id="cs5"><div class="wrap">
+  <div class="cs-head"><div>
+    <div class="cs-id">CASE 05</div><h2 class="cs-title">Angle Library nạp cho AI video</h2>
+  </div><div class="cs-meta"><span class="m line">AI Content · Vleap</span><span class="m cad">Liên tục</span><span class="m">search → jsonl</span></div></div>
+
+  <div class="blk"><div class="lab">Tư duy chiến lược gốc</div>
+    <p class="strat">Dây chuyền AI video chỉ mạnh khi được nạp <b>nguyên liệu thật</b>, không phải angle bịa. Biến top content đã kiểm chứng thành dataset có cấu trúc rồi feed pipeline → sản xuất biến thể ở quy mô lớn mà vẫn bám trend thật. Đây là mắt xích nối MediaCrawler với FACTORY OS/AutoVid.</p></div>
+
+  <div class="blk"><div class="lab">Quy trình hoạt động</div>
+    <ol class="steps">
+      <li>Crawl đa ngách, lưu <b>jsonl</b>.</li>
+      <li><b>analyzer angle</b> lọc top 20% theo trend_score → <b>angle_library.jsonl</b>.</li>
+      <li>Prompt <b>normalize</b> điền pain/desire/cta cho từng angle.</li>
+      <li>Chuỗi prompt <b>concept → script → variation → compliance → scorecard</b> ra Video Brief JSON.</li>
+      <li>Nạp Video Brief vào AutoVid dựng clip 15–20s.</li>
+    </ol></div>
+
+  <div class="two">
+    <div class="blk"><div class="lab">Analyzer / code</div>
+      <div class="term"><div class="term-bar"><i></i><i></i><i></i><span class="t">export</span></div>
+<pre><span class="c"># export_angles() -> angle_library.jsonl</span>
+python3 mediacrawler_analyzer.py <span class="s">angle</span> \
+  data/douyin/search_*.xlsx</pre></div></div>
+    <div class="blk"><div class="lab">Prompt library</div>
+      <div class="term"><div class="term-bar"><i></i><i></i><i></i><span class="t">prompts/angle_to_video_prompts.py</span></div>
+<pre><span class="k">from</span> angle_to_video_prompts <span class="k">import</span> (
+  build_script_prompt, VIDEO_BRIEF_SCHEMA)
+msgs = build_script_prompt(concept, brief, <span class="n">18</span>)
+<span class="c"># -> Messages API -> Video Brief JSON</span></pre></div></div>
+  </div>
+
+  <div class="out" style="margin-top:16px"><b>Output:</b> <span class="mono">angle_library.jsonl</span> (dataset) → Video Brief JSON (theo VIDEO_BRIEF_SCHEMA) nạp thẳng pipeline.</div>
+</div></section>
+
+<!-- ================= CS6 ================= -->
+<section class="cs" id="cs6"><div class="wrap">
+  <div class="cs-head"><div>
+    <div class="cs-id">CASE 06</div><h2 class="cs-title">Bản đồ độ bão hoà ngách</h2>
+  </div><div class="cs-meta"><span class="m line">Chiến lược / E-com</span><span class="m cad">Trước khi vào ngách</span><span class="m">search</span></div></div>
+
+  <div class="blk"><div class="lab">Tư duy chiến lược gốc</div>
+    <p class="strat">Đổ ngân sách vào ngách đã bão hoà là đốt tiền. Trước khi cam kết, cần biết ngách đó đang ở <b>góc phần tư</b> nào: nhiều bài mà tương tác thấp = đỏ; ít bài mà save cao = biển xanh. Đây là công cụ ra quyết định vào/không vào, không phải công cụ sản xuất.</p></div>
+
+  <div class="blk"><div class="lab">Quy trình hoạt động</div>
+    <ol class="steps">
+      <li>Crawl <b>search</b> nhiều từ khoá ngách (mỗi từ khoá là một điểm dữ liệu).</li>
+      <li><b>analyzer opportunity</b> gom theo source_keyword: volume vs save TB, chia quadrant theo median.</li>
+      <li>Ưu tiên biển xanh; ngách cạnh tranh chỉ vào khi có angle khác biệt (từ CS1/CS2).</li>
+    </ol></div>
+
+  <div class="two">
+    <div class="blk"><div class="lab">Analyzer / code</div>
+      <div class="term"><div class="term-bar"><i></i><i></i><i></i><span class="t">analyze</span></div>
+<pre>python3 mediacrawler_analyzer.py <span class="s">opportunity</span> \
+  data/douyin/search_*.xlsx
+<span class="c"># quadrant tự tính theo median</span></pre></div></div>
+    <div class="out"><b>Output:</b> <span class="mono">OPPORTUNITY_MAP_sample.xlsx</span> — cột Quadrant + Quyết định (ĐÁNH / cần angle / chờ / TRÁNH). Công thức tự cập nhật khi thêm dòng.</div>
+  </div>
+</div></section>
+
+<!-- ================= CS7 ================= -->
+<section class="cs" id="cs7"><div class="wrap">
+  <div class="cs-head"><div>
+    <div class="cs-id">CASE 07</div><h2 class="cs-title">Radar mùa vụ &amp; lịch nội dung</h2>
+  </div><div class="cs-meta"><span class="m line">Agency planning / Ads</span><span class="m cad">Định kỳ · tháng</span><span class="m">search + time</span></div></div>
+
+  <div class="blk"><div class="lab">Tư duy chiến lược gốc</div>
+    <p class="strat">Agency phản ứng theo trend là bị động; agency <b>đón đầu</b> theo mùa là chủ động. Nội dung có chu kỳ (Tết, 6/6, 9/9, mùa tựu trường). Dò sóng theo thời gian đăng giúp dựng lịch content &amp; ngân sách ads trước 3–4 tuần thay vì chạy theo.</p></div>
+
+  <div class="blk"><div class="lab">Quy trình hoạt động</div>
+    <ol class="steps">
+      <li>Crawl <b>search</b> có bật thu thập thời gian đăng, phủ ngành hàng khách.</li>
+      <li><b>analyzer seasonal</b> tổng hợp theo tuần, đánh dấu spike (vượt 1.5× trung bình trượt 4 tuần).</li>
+      <li>Đối chiếu spike với lịch sự kiện thương mại → chốt lịch sản xuất &amp; đẩy ads.</li>
+    </ol></div>
+
+  <div class="two">
+    <div class="blk"><div class="lab">Analyzer / code</div>
+      <div class="term"><div class="term-bar"><i></i><i></i><i></i><span class="t">analyze</span></div>
+<pre>python3 mediacrawler_analyzer.py <span class="s">seasonal</span> \
+  data/douyin/search_*.xlsx
+<span class="c"># dùng create_time -> week + cờ spike</span></pre></div></div>
+    <div class="out"><b>Output:</b> <span class="mono">CS7_seasonal_radar.xlsx</span> — bảng tuần × keyword, cột eng_ma4 &amp; spike (đưa vào lịch content quý).</div>
+  </div>
+</div></section>
+
+<!-- ================= CS8 ================= -->
+<section class="cs" id="cs8"><div class="wrap">
+  <div class="cs-head"><div>
+    <div class="cs-id">CASE 08</div><h2 class="cs-title">Tình báo giá &amp; khuyến mãi</h2>
+  </div><div class="cs-meta"><span class="m line">E-com / TSP</span><span class="m cad">Theo đợt hàng</span><span class="m">search + comment</span></div></div>
+
+  <div class="blk"><div class="lab">Tư duy chiến lược gốc</div>
+    <p class="strat">Offer thắng không dựng trong phòng kín — nó phải <b>đè lên offer đối thủ</b>. Giá và mồi khuyến mãi lộ ra ngay trong mô tả và bình luận ("giá bao nhiêu", "sale không", "买一送一"). Gom lại thành bản đồ giá/combo giúp dựng offer sắc hơn cho gian hàng.</p></div>
+
+  <div class="blk"><div class="lab">Quy trình hoạt động</div>
+    <ol class="steps">
+      <li>Crawl <b>search</b> theo tên sản phẩm/đối thủ, bật comment.</li>
+      <li><b>analyzer price</b> trích giá (regex đa mẫu) + mồi khuyến mãi.</li>
+      <li>Đối chiếu → thiết kế offer &amp; voucher giỏ vàng cạnh tranh hơn.</li>
+    </ol></div>
+
+  <div class="two">
+    <div class="blk"><div class="lab">Analyzer / code</div>
+      <div class="term"><div class="term-bar"><i></i><i></i><i></i><span class="t">analyze</span></div>
+<pre>python3 mediacrawler_analyzer.py <span class="s">price</span> \
+  data/xhs/search_*.xlsx
+<span class="c"># regex giá ¥/元/k/đ + từ khoá KM</span></pre></div></div>
+    <div class="out"><b>Output:</b> <span class="mono">OPPORTUNITY_MAP_sample.xlsx</span> → sheet <b>Price Intel</b> (giá quan sát · combo · đối sách offer của ta).</div>
+  </div>
+</div></section>
+
+<!-- ================= CS9 ================= -->
+<section class="cs" id="cs9"><div class="wrap">
+  <div class="cs-head"><div>
+    <div class="cs-id">CASE 09</div><h2 class="cs-title">Săn &amp; tuyển KOC đang lên</h2>
+  </div><div class="cs-meta"><span class="m line">MCN</span><span class="m cad">Định kỳ · 2 tuần</span><span class="m">search → koc</span></div></div>
+
+  <div class="blk"><div class="lab">Tư duy chiến lược gốc</div>
+    <p class="strat">KOC rẻ nhất là KOC <b>chưa nổi</b>. Nếu đợi họ lên top mới ký, giá đã gấp nhiều lần. Đo velocity (đà tăng tương tác) để bắt creator đang lên và tiếp cận trước khi thị trường phát hiện — đây là nguồn tuyển bền cho MCN.</p></div>
+
+  <div class="blk"><div class="lab">Quy trình hoạt động</div>
+    <ol class="steps">
+      <li>Crawl <b>search</b> ngách MCN quan tâm (nhiều creator xuất hiện).</li>
+      <li><b>analyzer koc</b> tính velocity &amp; độ đều; lọc cờ <b>rising</b> (velocity ≥1.3 &amp; đều ≥0.4).</li>
+      <li>Alert team MCN danh sách creator đang lên → tiếp cận sớm.</li>
+    </ol></div>
+
+  <div class="two">
+    <div class="blk"><div class="lab">Analyzer / code</div>
+      <div class="term"><div class="term-bar"><i></i><i></i><i></i><span class="t">analyze</span></div>
+<pre>python3 mediacrawler_analyzer.py <span class="s">koc</span> \
+  data/douyin/search_*.xlsx
+<span class="c"># xuất thêm CS9_rising_creators.xlsx</span></pre></div></div>
+    <div class="n8n"><b>n8n:</b> WF-MC3 chạy 2 tuần/lần → crawl → analyzer koc → nếu có creator rising thì alert team MCN qua webhook.</div>
+  </div>
+</div></section>
+
+<!-- ================= CS10 ================= -->
+<section class="cs" id="cs10"><div class="wrap">
+  <div class="cs-head"><div>
+    <div class="cs-id">CASE 10</div><h2 class="cs-title">Thư viện âm thanh trending</h2>
+  </div><div class="cs-meta"><span class="m line">Content / AI video</span><span class="m cad">Định kỳ · tuần</span><span class="m">gộp từ CS1</span></div></div>
+
+  <div class="blk"><div class="lab">Tư duy chiến lược gốc</div>
+    <p class="strat">Nhạc là đòn bẩy phân phối của short video — bám đúng sound đang lên tăng reach đáng kể, nhưng cửa sổ chỉ 1–2 tuần. Gom sound lặp lại trong dữ liệu trend thành watchlist giúp team dựng bắt sóng đúng lúc. <b>Lưu ý:</b> chỉ dùng lại qua thư viện nhạc hợp lệ của TikTok, không bê file gốc.</p></div>
+
+  <div class="blk"><div class="lab">Quy trình hoạt động</div>
+    <ol class="steps">
+      <li>Tận dụng dữ liệu CS1 (đã có music_download_url).</li>
+      <li><b>analyzer trend</b> tự gom sound xuất hiện ≥2 lần, xếp theo tần suất &amp; engagement.</li>
+      <li>Cập nhật Sound Watchlist hàng tuần; đánh dấu velocity để ưu tiên.</li>
+    </ol></div>
+
+  <div class="out"><b>Output:</b> <span class="mono">TREND_BRIEF_sample.xlsx</span> → sheet <b>Sound Watchlist</b> (sound ref · số video · velocity · ghi chú sử dụng). Sinh cùng lúc với CS1.</div>
+</div></section>
+
+<!-- ================= CS11 ================= -->
+<section class="cs" id="cs11"><div class="wrap">
+  <div class="cs-head"><div>
+    <div class="cs-id">CASE 11</div><h2 class="cs-title">Giám sát Share-of-Voice đối thủ</h2>
+  </div><div class="cs-meta"><span class="m line">Chiến lược / Báo cáo khách</span><span class="m cad">Định kỳ · tháng</span><span class="m">search lặp</span></div></div>
+
+  <div class="blk"><div class="lab">Tư duy chiến lược gốc</div>
+    <p class="strat">Khách hàng trả tiền cho agency không chỉ để làm content, mà để <b>biết mình đang thắng/thua ai</b>. Theo dõi định kỳ một rổ brand và quy đổi engagement thành %SOV tạo ra báo cáo giá trị cao — vừa giữ khách, vừa mở đường upsell.</p></div>
+
+  <div class="blk"><div class="lab">Quy trình hoạt động</div>
+    <ol class="steps">
+      <li>Định nghĩa rổ brand + từ khoá nhận diện (brand_map.json).</li>
+      <li>Crawl <b>search</b> tuần tự từng brand (concurrency 1).</li>
+      <li><b>analyzer sov</b> gắn bài vào brand, tính %SOV theo tuần.</li>
+      <li>Ghi Supabase → dashboard → xuất báo cáo khách hàng hàng tháng.</li>
+    </ol></div>
+
+  <div class="two">
+    <div class="blk"><div class="lab">Analyzer / code</div>
+      <div class="term"><div class="term-bar"><i></i><i></i><i></i><span class="t">analyze</span></div>
+<pre>python3 mediacrawler_analyzer.py <span class="s">sov</span> \
+  data/douyin/search_*.xlsx brand_map.json</pre></div></div>
+    <div class="n8n"><b>n8n:</b> WF-MC2 chạy mùng 1 hàng tháng → crawl tuần tự cả rổ → analyzer sov → ghi Supabase → báo account team.</div>
+  </div>
+  <div class="out" style="margin-top:16px"><b>Output:</b> <span class="mono">SOV_DASHBOARD_sample.xlsx</span> — sheet DATA (nhập) + sheet Dashboard (%SOV &amp; biến động tự tính bằng SUMIFS).</div>
+</div></section>
+
+<!-- ================= ROADMAP ================= -->
+<section class="road" id="road"><div class="wrap">
+  <div class="cs-id" style="color:var(--signal)">TRIỂN KHAI</div>
+  <h2 class="cs-title" style="font-size:30px;margin-top:6px">Lộ trình cắm vào hạ tầng DigiAds</h2>
+  <p class="muted" style="max-width:720px;margin-top:10px">"Nhanh &amp; mạnh hơn" = thông minh hơn, không phải đập mạnh hơn. Đập mạnh làm tăng rủi ro bị chặn và pháp lý. Ưu tiên Tier 1 (ROI cao, rủi ro thấp).</p>
+  <table>
+    <thead><tr><th>Tier</th><th>Nâng cấp</th><th>Tận dụng sẵn có</th><th>Kết quả</th></tr></thead>
+    <tbody>
+      <tr><td><span class="tier t1">TIER 1</span></td><td>Ghi thẳng <b>Supabase/Postgres</b> + lớp enrichment (chuẩn hoá count, dịch ZH→VI, velocity)</td><td><code>Supabase MCP</code></td><td class="muted">Dữ liệu truy vấn được, dashboard, dedupe</td></tr>
+      <tr><td><span class="tier t1">TIER 1</span></td><td><b>Webhook → n8n</b> khi crawl xong (3 luồng MC1/MC2/MC3 đã dựng)</td><td><code>n8n</code></td><td class="muted">Trend Brief &amp; alert tự động, giải phóng người</td></tr>
+      <tr><td><span class="tier t2">TIER 2</span></td><td><b>Hàng đợi job (Redis+arq)</b> + crawl tăng dần/resume theo post ID</td><td><code>arq (AutoVid)</code></td><td class="muted">Chạy nhiều ngách có kiểm soát; monitoring rẻ</td></tr>
+      <tr><td><span class="tier t2">TIER 2</span></td><td><b>Lịch tự động</b> (đã có trong n8n schedule trigger)</td><td><code>n8n cron</code></td><td class="muted">Radar chạy nền, nạp pipeline mỗi sáng</td></tr>
+      <tr><td><span class="tier t3">TIER 3</span></td><td><b>Multi-account + proxy rotation</b> — <span style="color:var(--signal)">chỉ khi có rà soát pháp lý</span></td><td><code>proxy/ (repo)</code></td><td class="muted">Tăng throughput; rủi ro cao nhất</td></tr>
+      <tr><td><span class="tier t3">TIER 3</span></td><td>Chế độ API trực tiếp (bỏ browser) — nhanh nhưng dễ vỡ</td><td class="dim">—</td><td class="muted">Không khuyến nghị làm sớm</td></tr>
+    </tbody>
+  </table>
+</div></section>
+
+<footer><div class="wrap">
+  <b style="color:var(--text)">DigiAds · Trend Intelligence Engine</b> — Sổ tay triển khai 11 case study.<br>
+  Chỉ dùng nghiên cứu nội bộ dữ liệu công khai · tuân thủ ToS nền tảng &amp; Nghị định 13/2023 · Tier 3 cần rà soát pháp lý trước.
+</div></footer>
+
+</body>
+</html>

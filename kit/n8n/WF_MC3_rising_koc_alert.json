@@ -1,0 +1,134 @@
+{
+  "name": "WF-MC3 · Săn KOC đang lên (CS9) — 2 tuần/lần",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": { "interval": [{ "field": "weeks", "weeksInterval": 2, "triggerAtDay": [3], "triggerAtHour": 8 }] }
+      },
+      "name": "Lịch: Thứ 4 · 08:00 · 2 tuần/lần",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:8080/api/crawler/start",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"platform\": \"dy\",\n  \"crawler_type\": \"search\",\n  \"keywords\": \"平价好物,测评,护肤分享\",\n  \"enable_comments\": false,\n  \"save_option\": \"excel\",\n  \"max_notes_count\": 300,\n  \"headless\": true\n}",
+        "options": {}
+      },
+      "name": "Crawl ngách MCN quan tâm",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [220, 0]
+    },
+    {
+      "parameters": { "amount": 15, "unit": "minutes" },
+      "name": "Chờ 15 phút",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [440, 0]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "http://127.0.0.1:8080/api/crawler/status",
+        "options": {}
+      },
+      "name": "Trạng thái",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [660, 0]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "typeValidation": "strict" },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "running",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "Còn chạy?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [880, 0]
+    },
+    {
+      "parameters": {
+        "command": "cd /opt/digiads/kit/analyzer && python3 mediacrawler_analyzer.py koc \"$(ls -t /opt/MediaCrawler/data/douyin/*.xlsx | head -1)\" && python3 -c \"import pandas as pd,json; d=pd.read_excel('reports/CS9_rising_creators.xlsx'); print(json.dumps({'count':len(d),'top':d.head(5).to_dict('records')},ensure_ascii=False,default=str))\""
+      },
+      "name": "Analyzer: KOC + rising",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [1100, 120]
+    },
+    {
+      "parameters": {
+        "jsCode": "let payload = { count: 0, top: [] };\ntry {\n  const lines = ($json.stdout || '').trim().split('\\n');\n  payload = JSON.parse(lines[lines.length - 1]);\n} catch (e) {}\nconst hot = payload.count > 0;\nconst lines = (payload.top || []).map(k => `• ${k.nickname || k.creator} — điểm ${k.diem_tong}, velocity ${k.velocity}x, ${k.so_video} video`);\nreturn [{ json: { hot, count: payload.count, summary: lines.join('\\n') } }];"
+      },
+      "name": "Đóng gói cảnh báo",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1320, 120]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "typeValidation": "strict" },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.hot }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "true", "singleValue": true }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "Có creator đang lên?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1540, 120]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.NOTIFY_WEBHOOK_URL }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"channel\": \"mcn-team\",\n  \"title\": \"🚀 {{ $json.count }} KOC đang lên — tiếp cận trước khi giá tăng\",\n  \"text\": {{ JSON.stringify($json.summary) }}\n}",
+        "options": {}
+      },
+      "name": "Alert team MCN",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1760, 60]
+    }
+  ],
+  "connections": {
+    "Lịch: Thứ 4 · 08:00 · 2 tuần/lần": { "main": [[{ "node": "Crawl ngách MCN quan tâm", "type": "main", "index": 0 }]] },
+    "Crawl ngách MCN quan tâm": { "main": [[{ "node": "Chờ 15 phút", "type": "main", "index": 0 }]] },
+    "Chờ 15 phút": { "main": [[{ "node": "Trạng thái", "type": "main", "index": 0 }]] },
+    "Trạng thái": { "main": [[{ "node": "Còn chạy?", "type": "main", "index": 0 }]] },
+    "Còn chạy?": {
+      "main": [
+        [{ "node": "Chờ 15 phút", "type": "main", "index": 0 }],
+        [{ "node": "Analyzer: KOC + rising", "type": "main", "index": 0 }]
+      ]
+    },
+    "Analyzer: KOC + rising": { "main": [[{ "node": "Đóng gói cảnh báo", "type": "main", "index": 0 }]] },
+    "Đóng gói cảnh báo": { "main": [[{ "node": "Có creator đang lên?", "type": "main", "index": 0 }]] },
+    "Có creator đang lên?": { "main": [[{ "node": "Alert team MCN", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" }
+}

@@ -1,0 +1,136 @@
+{
+  "name": "WF-MC1 · Trend Brief hàng tuần (CS1+CS10+CS5)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": { "interval": [{ "field": "weeks", "triggerAtDay": [1], "triggerAtHour": 7 }] }
+      },
+      "name": "Lịch: Thứ 2 · 07:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:8080/api/crawler/start",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"platform\": \"dy\",\n  \"crawler_type\": \"search\",\n  \"keywords\": \"护肤教程,穿搭,好物分享\",\n  \"enable_comments\": true,\n  \"enable_sub_comments\": false,\n  \"save_option\": \"excel\",\n  \"max_notes_count\": 200,\n  \"headless\": true\n}",
+        "options": {}
+      },
+      "name": "Start crawl (Douyin search)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [220, 0]
+    },
+    {
+      "parameters": { "amount": 10, "unit": "minutes" },
+      "name": "Chờ 10 phút",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [440, 0]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "http://127.0.0.1:8080/api/crawler/status",
+        "options": {}
+      },
+      "name": "Kiểm tra trạng thái",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [660, 0]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "typeValidation": "strict" },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "running",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "Còn chạy?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [880, 0]
+    },
+    {
+      "parameters": {
+        "command": "cd /opt/digiads/kit/analyzer && python3 mediacrawler_analyzer.py trend \"$(ls -t /opt/MediaCrawler/data/douyin/*.xlsx | head -1)\" && python3 mediacrawler_analyzer.py angle \"$(ls -t /opt/MediaCrawler/data/douyin/*.xlsx | head -1)\""
+      },
+      "name": "Analyzer: trend + angle export",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [1100, 120]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-api-key", "value": "={{ $env.ANTHROPIC_API_KEY }}" },
+            { "name": "anthropic-version", "value": "2023-06-01" },
+            { "name": "content-type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"claude-sonnet-4-6\",\n  \"max_tokens\": 2000,\n  \"system\": \"Bạn là Content Strategist của DigiAds. Từ dữ liệu trend tuần, viết Trend Brief tiếng Việt: 10 format đang lên, 5 hook mẫu bản địa hoá, 3 nhạc trending nên bám. Ngắn gọn, hành động được ngay. Không sao chép câu chữ gốc.\",\n  \"messages\": [{\n    \"role\": \"user\",\n    \"content\": \"Dữ liệu analyzer tuần này (top formats + sounds):\\n{{ $json.stdout }}\"\n  }]\n}",
+        "options": {}
+      },
+      "name": "Claude: viết Trend Brief",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1320, 120]
+    },
+    {
+      "parameters": {
+        "jsCode": "const blocks = $json.content || [];\nconst brief = blocks.filter(b => b.type === 'text').map(b => b.text).join('\\n');\nreturn [{ json: { brief, week: new Date().toISOString().slice(0,10) } }];"
+      },
+      "name": "Trích brief",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1540, 120]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.NOTIFY_WEBHOOK_URL }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"channel\": \"content-team\",\n  \"title\": \"📡 Trend Brief tuần {{ $json.week }}\",\n  \"text\": {{ JSON.stringify($json.brief) }}\n}",
+        "options": {}
+      },
+      "name": "Gửi team (Zalo/Slack webhook)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1760, 120]
+    }
+  ],
+  "connections": {
+    "Lịch: Thứ 2 · 07:00": { "main": [[{ "node": "Start crawl (Douyin search)", "type": "main", "index": 0 }]] },
+    "Start crawl (Douyin search)": { "main": [[{ "node": "Chờ 10 phút", "type": "main", "index": 0 }]] },
+    "Chờ 10 phút": { "main": [[{ "node": "Kiểm tra trạng thái", "type": "main", "index": 0 }]] },
+    "Kiểm tra trạng thái": { "main": [[{ "node": "Còn chạy?", "type": "main", "index": 0 }]] },
+    "Còn chạy?": {
+      "main": [
+        [{ "node": "Chờ 10 phút", "type": "main", "index": 0 }],
+        [{ "node": "Analyzer: trend + angle export", "type": "main", "index": 0 }]
+      ]
+    },
+    "Analyzer: trend + angle export": { "main": [[{ "node": "Claude: viết Trend Brief", "type": "main", "index": 0 }]] },
+    "Claude: viết Trend Brief": { "main": [[{ "node": "Trích brief", "type": "main", "index": 0 }]] },
+    "Trích brief": { "main": [[{ "node": "Gửi team (Zalo/Slack webhook)", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" }
+}
