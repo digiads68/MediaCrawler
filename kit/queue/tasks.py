@@ -29,7 +29,9 @@ ANALYZE_COMMANDS = {"trend", "insight", "koc", "opportunity", "seasonal",
 
 def _run_analyzer(command: str, file_path: str, to_supabase: bool = False,
                   dry_run: bool = False, notify: bool = False,
-                  brand_map: str | None = None) -> dict[str, Any]:
+                  brand_map: str | None = None, incremental: bool = False,
+                  checkpoint_db: str | None = None, platform: str = "",
+                  keyword: str = "") -> dict[str, Any]:
     """Chạy 1 lệnh analyzer trên file dữ liệu (đồng bộ, pandas)."""
     import json
 
@@ -38,6 +40,19 @@ def _run_analyzer(command: str, file_path: str, to_supabase: bool = False,
     if command not in ANALYZE_COMMANDS:
         raise ValueError(f"Lệnh phân tích không hợp lệ: {command}")
     df = an.load(file_path)
+
+    # Crawl tăng dần: chỉ xử lý post mới, cập nhật checkpoint sau khi xong
+    ckpt_store = None
+    ckpt_new_ids: list[str] = []
+    if incremental:
+        from kit.storage.checkpoint import filter_new_posts, make_checkpoint_store
+        ckpt_store = make_checkpoint_store(checkpoint_db)
+        df, ckpt_new_ids = filter_new_posts(df, ckpt_store, platform, keyword)
+        if df.empty:
+            print("[✓] Không có post mới — bỏ qua phân tích.")
+            return {"command": command, "rows": 0, "file": file_path,
+                    "skipped": True}
+
     writer = None
     if to_supabase:
         from kit.storage.supabase_writer import SupabaseWriter
@@ -87,6 +102,10 @@ def _run_analyzer(command: str, file_path: str, to_supabase: bool = False,
         if notify:
             from kit.webhook import notify_sov_updated
             notify_sov_updated()
+
+    if ckpt_store is not None:
+        from kit.storage.checkpoint import commit_checkpoint
+        commit_checkpoint(df, ckpt_new_ids, ckpt_store, platform, keyword)
     return {"command": command, "rows": rows, "file": file_path}
 
 
@@ -132,6 +151,7 @@ async def crawl_and_analyze(ctx: dict[str, Any], platform: str,
             "notify": False, "brand_map": None, "save_option": "excel",
             "max_notes_count": None, "api_base": API_BASE_DEFAULT,
             "poll_interval": POLL_INTERVAL_S, "timeout": CRAWL_TIMEOUT_S,
+            "incremental": False, "checkpoint_db": None,
             **(options or {})}
 
     client: httpx.AsyncClient | None = ctx.get("http_client")
@@ -163,7 +183,9 @@ async def crawl_and_analyze(ctx: dict[str, Any], platform: str,
         # 4. Phân tích (chạy sync trong thread để không chặn event loop)
         result = await asyncio.to_thread(
             _run_analyzer, opts["analyze"], data_file,
-            opts["to_supabase"], opts["dry_run"], opts["notify"], opts["brand_map"])
+            opts["to_supabase"], opts["dry_run"], opts["notify"],
+            opts["brand_map"], opts["incremental"], opts["checkpoint_db"],
+            platform, keywords)
         logger.info("Job xong: %s — %s dòng.", result["command"], result["rows"])
         return {"status": "ok", **result}
     finally:

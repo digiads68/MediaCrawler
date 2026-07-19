@@ -39,7 +39,8 @@ def fake_analyzer(monkeypatch):
     calls: list[dict] = []
 
     def spy(command, file_path, to_supabase=False, dry_run=False,
-            notify=False, brand_map=None):
+            notify=False, brand_map=None, incremental=False,
+            checkpoint_db=None, platform="", keyword=""):
         calls.append({"command": command, "file": file_path,
                       "to_supabase": to_supabase, "notify": notify})
         return {"command": command, "rows": 7, "file": file_path}
