@@ -272,7 +272,7 @@ def main() -> None:
         print(__doc__)
         sys.exit(0)
     angle_jsonl = args[0]
-    product, provider, limit = "", "claude", 10
+    product, provider, limit, notify = "", "claude", 10, False
     i = 1
     while i < len(args):
         if args[i] == "--product":
@@ -281,12 +281,17 @@ def main() -> None:
             provider = args[i + 1]; i += 2
         elif args[i] == "--limit":
             limit = int(args[i + 1]); i += 2
+        elif args[i] == "--notify":
+            notify = True; i += 1
         else:
             print(f"Đối số không hợp lệ: {args[i]}"); sys.exit(1)
     if not product:
         print("Thiếu --product \"mô tả sản phẩm\""); sys.exit(1)
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
-    run(angle_jsonl, product, limit=limit, provider=provider)
+    briefs = run(angle_jsonl, product, limit=limit, provider=provider)
+    if notify:
+        from kit.webhook import emit
+        emit("briefs_ready", {"count": len(briefs), "product": product})
 
 
 if __name__ == "__main__":

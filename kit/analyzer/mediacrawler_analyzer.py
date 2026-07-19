@@ -349,10 +349,11 @@ def export_angles(df: pd.DataFrame, top_pct: float = 0.2) -> Path:
 # CLI
 # ============================================================================
 
-def _parse_args(argv: list[str]) -> tuple[list[str], str | None, bool]:
-    """Tách cờ tuỳ chọn (--to <đích>, --dry-run) khỏi đối số vị trí."""
+def _parse_args(argv: list[str]) -> tuple[list[str], str | None, bool, bool]:
+    """Tách cờ tuỳ chọn (--to <đích>, --dry-run, --notify) khỏi đối số vị trí."""
     to: str | None = None
     dry_run = False
+    notify = False
     pos: list[str] = []
     i = 0
     while i < len(argv):
@@ -363,13 +364,15 @@ def _parse_args(argv: list[str]) -> tuple[list[str], str | None, bool]:
             to = argv[i + 1]; i += 2
         elif a == "--dry-run":
             dry_run = True; i += 1
+        elif a == "--notify":
+            notify = True; i += 1
         else:
             pos.append(a); i += 1
-    return pos, to, dry_run
+    return pos, to, dry_run, notify
 
 
 def main():
-    pos, to, dry_run = _parse_args(sys.argv[1:])
+    pos, to, dry_run, notify = _parse_args(sys.argv[1:])
     if len(pos) < 2:
         print(__doc__); sys.exit(0)
     cmd, path = pos[0], pos[1]
@@ -386,12 +389,25 @@ def main():
         res = trend_radar(df)
         if writer:
             writer.upsert_trend_posts(res["top_posts"])
+        if notify:
+            from kit.webhook import notify_trend_brief
+            fmt = res["formats"]
+            top_fmt = fmt.iloc[0]["format"] if len(fmt) else "khác"
+            notify_trend_brief(
+                f"Trend radar: {len(res['top_posts'])} bài top, "
+                f"format thắng thế: {top_fmt}.")
     elif cmd == "insight":
         comment_bank(df)
     elif cmd == "koc":
         s = koc_scorecard(df)
         if writer and len(s):
             writer.upsert_koc(s)
+        if notify and len(s):
+            from kit.webhook import notify_rising_koc
+            rising = s[s["rising"]]
+            notify_rising_koc(rising[["creator", "so_video", "eng_tb",
+                                      "velocity", "diem_tong"]]
+                              .to_dict(orient="records"))
     elif cmd == "opportunity":
         opportunity_map(df)
     elif cmd == "seasonal":
@@ -412,6 +428,9 @@ def main():
         g = sov(df, bm)
         if writer and len(g):
             writer.upsert_sov(g)
+        if notify:
+            from kit.webhook import notify_sov_updated
+            notify_sov_updated()
     else:
         print(f"Lệnh không hợp lệ: {cmd}"); sys.exit(1)
 
