@@ -349,22 +349,69 @@ def export_angles(df: pd.DataFrame, top_pct: float = 0.2) -> Path:
 # CLI
 # ============================================================================
 
+def _parse_args(argv: list[str]) -> tuple[list[str], str | None, bool]:
+    """Tách cờ tuỳ chọn (--to <đích>, --dry-run) khỏi đối số vị trí."""
+    to: str | None = None
+    dry_run = False
+    pos: list[str] = []
+    i = 0
+    while i < len(argv):
+        a = argv[i]
+        if a == "--to":
+            if i + 1 >= len(argv):
+                print("Thiếu giá trị cho --to (vd: --to supabase)"); sys.exit(1)
+            to = argv[i + 1]; i += 2
+        elif a == "--dry-run":
+            dry_run = True; i += 1
+        else:
+            pos.append(a); i += 1
+    return pos, to, dry_run
+
+
 def main():
-    if len(sys.argv) < 3:
+    pos, to, dry_run = _parse_args(sys.argv[1:])
+    if len(pos) < 2:
         print(__doc__); sys.exit(0)
-    cmd, path = sys.argv[1], sys.argv[2]
+    cmd, path = pos[0], pos[1]
     df = load(path)
-    if cmd == "trend":        trend_radar(df)
-    elif cmd == "insight":    comment_bank(df)
-    elif cmd == "koc":        koc_scorecard(df)
-    elif cmd == "opportunity":opportunity_map(df)
-    elif cmd == "seasonal":   seasonal_radar(df)
-    elif cmd == "price":      price_intel(df)
-    elif cmd == "angle":      export_angles(df)
+
+    writer = None
+    if to == "supabase":
+        from kit.storage.supabase_writer import SupabaseWriter
+        writer = SupabaseWriter(dry_run=dry_run)
+    elif to is not None:
+        print(f"Đích lưu chưa hỗ trợ: {to} (hiện có: supabase)"); sys.exit(1)
+
+    if cmd == "trend":
+        res = trend_radar(df)
+        if writer:
+            writer.upsert_trend_posts(res["top_posts"])
+    elif cmd == "insight":
+        comment_bank(df)
+    elif cmd == "koc":
+        s = koc_scorecard(df)
+        if writer and len(s):
+            writer.upsert_koc(s)
+    elif cmd == "opportunity":
+        opportunity_map(df)
+    elif cmd == "seasonal":
+        seasonal_radar(df)
+    elif cmd == "price":
+        p = price_intel(df)
+        if writer and len(p):
+            writer.upsert_price(p)
+    elif cmd == "angle":
+        out_path = export_angles(df)
+        if writer:
+            with open(out_path, encoding="utf-8") as f:
+                records = [json.loads(line) for line in f if line.strip()]
+            writer.upsert_angles(records)
     elif cmd == "sov":
-        bm = json.loads(Path(sys.argv[3]).read_text(encoding="utf-8")) \
-             if len(sys.argv) > 3 else {}
-        sov(df, bm)
+        bm = json.loads(Path(pos[2]).read_text(encoding="utf-8")) \
+             if len(pos) > 2 else {}
+        g = sov(df, bm)
+        if writer and len(g):
+            writer.upsert_sov(g)
     else:
         print(f"Lệnh không hợp lệ: {cmd}"); sys.exit(1)
 
