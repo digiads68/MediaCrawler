@@ -29,28 +29,25 @@ from __future__ import annotations
 import json
 import re
 import sys
-from collections import Counter
 from pathlib import Path
 
 import pandas as pd
 
+# Cho phép chạy trực tiếp `python kit/analyzer/mediacrawler_analyzer.py ...`
+# (thêm gốc repo vào sys.path để import được package kit)
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
+# Console Windows mặc định cp1252 — ép UTF-8 để log tiếng Việt/ký hiệu không vỡ
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+
+# Nguồn sự thật của COUNT_COLS/FORMAT_RULES/normalize nằm ở kit/enrich/normalize.py
+from kit.enrich.normalize import COUNT_COLS, FORMAT_RULES, normalize  # noqa: E402,F401
+
 # ============================================================================
 # 0. TIỆN ÍCH CHUNG — nạp & chuẩn hoá dữ liệu MediaCrawler
 # ============================================================================
-
-COUNT_COLS = ["liked_count", "comment_count", "share_count", "collected_count",
-              "video_play_count", "like_count", "sub_comment_count"]
-
-# Bảng nhận diện FORMAT từ tiêu đề/mô tả (mở rộng dần theo ngành khách)
-FORMAT_RULES = {
-    "before-after": ["前后", "对比", "变化", "7天", "30天", "trước sau", "thay đổi"],
-    "review/測評":  ["测评", "评测", "真实", "亲测", "review", "đánh giá"],
-    "list/top":     ["清单", "合集", "top", "盘点", "必买", "list"],
-    "tutorial":     ["教程", "教你", "步骤", "how", "hướng dẫn", "cách"],
-    "unboxing":     ["开箱", "到货", "unboxing", "đập hộp"],
-    "storytime":    ["故事", "经历", "翻车", "踩雷", "storytime"],
-    "pov/skit":     ["pov", "当你", "剧情", "假如"],
-}
 
 PRICE_PATTERNS = [
     r"(\d+(?:\.\d+)?)\s*元", r"¥\s*(\d+(?:\.\d+)?)", r"(\d+(?:\.\d+)?)\s*块",
@@ -72,39 +69,6 @@ def load(path: str | Path) -> pd.DataFrame:
     else:
         raise ValueError(f"Định dạng chưa hỗ trợ: {p.suffix}")
     return normalize(df)
-
-
-def normalize(df: pd.DataFrame) -> pd.DataFrame:
-    """Chuẩn hoá: count dạng Text -> số; create_time -> datetime; thêm cột dẫn xuất."""
-    df = df.copy()
-    for c in COUNT_COLS:
-        if c in df.columns:
-            df[c] = (df[c].astype(str)
-                     .str.replace(r"[^\d.]", "", regex=True)
-                     .replace("", "0").astype(float))
-    if "create_time" in df.columns:
-        ts = pd.to_numeric(df["create_time"], errors="coerce")
-        # MediaCrawler lưu epoch giây hoặc mili-giây tuỳ nền tảng
-        ts = ts.where(ts < 1e12, ts / 1000)
-        df["created_at"] = pd.to_datetime(ts, unit="s", errors="coerce")
-        df["week"] = df["created_at"].dt.strftime("%G-W%V")
-    # Engagement tổng & tỷ lệ "đáng lưu"
-    like = df.get("liked_count", 0)
-    df["eng_total"] = (df.get("liked_count", 0) + df.get("comment_count", 0)
-                       + df.get("share_count", 0) + df.get("collected_count", 0))
-    df["save_rate"] = df.get("collected_count", 0) / like.replace(0, pd.NA) \
-        if hasattr(like, "replace") else 0
-    df["share_rate"] = df.get("share_count", 0) / like.replace(0, pd.NA) \
-        if hasattr(like, "replace") else 0
-    # Gắn nhãn format
-    text = (df.get("title", "").fillna("") + " " + df.get("desc", "").fillna("")).str.lower()
-    def tag(t: str) -> str:
-        for fmt, kws in FORMAT_RULES.items():
-            if any(k in t for k in kws):
-                return fmt
-        return "khác"
-    df["format"] = text.map(tag)
-    return df
 
 
 def _out(df: pd.DataFrame, name: str) -> Path:
