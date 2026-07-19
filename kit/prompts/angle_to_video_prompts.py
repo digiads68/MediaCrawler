@@ -20,9 +20,8 @@ Nguyên tắc: chỉ dùng angle như CẢM HỨNG/khung. Không sao chép câu 
 quyền, hình ảnh gốc. Mọi output phải bản địa hoá tiếng Việt cho thị trường VN.
 """
 
-from dataclasses import dataclass, field, asdict
-from typing import Optional
 import json
+from dataclasses import dataclass, field
 
 MODEL_DEFAULT = "claude-sonnet-4-6"
 

@@ -9,7 +9,7 @@ validate + điều phối. Lỗi trả JSON rõ ràng (detail tiếng Việt).
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Literal, Optional
+from typing import Literal
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
@@ -33,7 +33,7 @@ class AnalyzeRequest(BaseModel):
     to_supabase: bool = False
     dry_run: bool = False
     notify: bool = False
-    brand_map: Optional[str] = Field(default=None,
+    brand_map: str | None = Field(default=None,
                                      description="Đường dẫn brand_map.json (cho sov)")
 
 

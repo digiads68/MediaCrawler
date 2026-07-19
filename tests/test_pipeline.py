@@ -60,7 +60,7 @@ def test_run_mock_xuat_briefs_jsonl(angle_jsonl, tmp_path):
                  provider="mock", out_dir=out_dir)
     assert len(briefs) == 2
     # brief đúng schema + truy vết được angle nguồn
-    for b, aid in zip(briefs, ["dy_001", "dy_002"]):
+    for b, aid in zip(briefs, ["dy_001", "dy_002"], strict=True):
         assert validate_brief(b) == []
         assert aid in b["source_angle_ids"]
         assert all(k in b for k in BRIEF_REQUIRED_KEYS)

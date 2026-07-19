@@ -16,9 +16,8 @@ Cần: pip install "mcp[cli]" httpx   (hoặc thêm vào uv)
 Yêu cầu: API MediaCrawler đang chạy  ->  uvicorn api.main:app --port 8080
 """
 
-import os
 import asyncio
-from typing import Optional
+import os
 
 import httpx
 from mcp.server.fastmcp import FastMCP
@@ -75,7 +74,7 @@ async def _wait_until_done() -> dict:
     return {"status": "timeout", "error_message": "Vượt trần thời gian chờ."}
 
 
-async def _newest_file(platform: str) -> Optional[dict]:
+async def _newest_file(platform: str) -> dict | None:
     async with httpx.AsyncClient(timeout=15) as c:
         r = await c.get(f"{API_BASE}/api/data/files", params={"platform": platform})
         r.raise_for_status()
@@ -199,7 +198,7 @@ async def get_status() -> dict:
 
 
 @mcp.tool()
-async def list_results(platform: Optional[str] = None) -> dict:
+async def list_results(platform: str | None = None) -> dict:
     """Liệt kê các file dữ liệu đã xuất, lọc theo nền tảng nếu cần."""
     params = {}
     if platform:

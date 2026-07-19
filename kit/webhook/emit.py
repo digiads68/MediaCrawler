@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import logging
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import httpx
@@ -34,7 +34,7 @@ def emit(event: str, payload: dict[str, Any],
         logger.info("Bỏ qua webhook: chưa đặt NOTIFY_WEBHOOK_URL.")
         return False
     body = {"event": event, "payload": payload,
-            "ts": datetime.now(timezone.utc).isoformat()}
+            "ts": datetime.now(UTC).isoformat()}
     own_client = client is None
     if own_client:
         client = httpx.Client(timeout=TIMEOUT_S)
