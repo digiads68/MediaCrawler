@@ -27,6 +27,22 @@ Hướng dẫn build từng bước: [BUILD_GUIDE_ClaudeCode.md](BUILD_GUIDE_Cla
 
 ## Quick start
 
+### Windows (double-click, tự cài đặt)
+
+```cmd
+git clone https://github.com/digiads68/MediaCrawler.git
+cd MediaCrawler
+start.bat
+```
+
+`start.bat` tự tạo `.venv`, cài dependencies, cài `uv`, build WebUI, tạo `.env`, rồi
+khởi động server ở `http://localhost:8080` (bind `0.0.0.0` — truy cập được qua
+[Tailscale](https://tailscale.com) từ máy khác, xem `docs/DEPLOY.md` PHẦN 0). Muốn crawl
+dữ liệu thật (không chỉ xem WebUI), chạy thêm `start_browser_cdp.bat` trước khi bấm
+**"Initiate Scan"** — chi tiết trong `docs/DEPLOY.md`.
+
+### Linux/macOS (thủ công)
+
 ```bash
 git clone https://github.com/digiads68/MediaCrawler.git && cd MediaCrawler
 
