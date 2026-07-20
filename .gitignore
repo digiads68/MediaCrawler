@@ -187,3 +187,6 @@ database/*.db
 # DigiAds Kit outputs
 kit/**/reports/
 kit/pipeline/out/
+
+# Local tool/editor config (Claude Code preview, v.v.) — không phải phần source
+.claude/
