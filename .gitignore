@@ -184,3 +184,6 @@ debug_tools
 
 database/*.db
 .omx/
+# DigiAds Kit outputs
+kit/**/reports/
+kit/pipeline/out/

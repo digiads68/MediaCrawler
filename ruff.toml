@@ -1,0 +1,32 @@
+# Cấu hình ruff cho phần DigiAds Kit (kit/, api/routers/kit.py, tests kit).
+# Base crawler giữ nguyên style gốc — không lint ở đây.
+
+line-length = 100
+target-version = "py311"
+
+# Chỉ lint code của kit (base repo có style riêng)
+include = [
+    "kit/**/*.py",
+    "api/routers/kit.py",
+    "tests/test_enrich.py",
+    "tests/test_storage.py",
+    "tests/test_pipeline.py",
+    "tests/test_webhook.py",
+    "tests/test_tasks.py",
+    "tests/test_checkpoint.py",
+    "tests/test_api_kit.py",
+    "tests/test_analyzer.py",
+]
+
+[lint]
+select = ["E", "F", "W", "I", "UP", "B"]
+ignore = [
+    "E501",   # dòng dài: docstring/chuỗi tiếng Việt cho phép thoáng hơn
+    "E701",   # nhiều lệnh 1 dòng — analyzer gốc dùng style compact cho CLI
+    "E702",
+    "UP009",  # giữ khai báo utf-8 đầu file theo convention của repo gốc
+]
+
+[lint.per-file-ignores]
+# analyzer giữ style compact gốc của kit
+"kit/analyzer/mediacrawler_analyzer.py" = ["E401", "E702", "E741"]
