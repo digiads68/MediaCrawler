@@ -22,8 +22,10 @@ jobs:
       - name: Cài dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install anthropic supabase arq "mcp[cli]" ruff
+          # Cài chung 1 lệnh: để pip giải ràng buộc fastapi/starlette cùng lúc
+          # với anthropic/supabase/arq/mcp — cài 2 lệnh riêng đã từng khiến pip
+          # âm thầm nâng starlette lên bản không tương thích fastapi==0.110.2.
+          pip install -r requirements.txt anthropic supabase arq "mcp[cli]" ruff
 
       - name: Lint (ruff — phạm vi kit)
         run: ruff check .
