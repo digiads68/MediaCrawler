@@ -21,9 +21,14 @@ crawl (media_platform/, REST api/ :8080)
   → n8n      (kit/webhook/ + kit/n8n/ — tự động hoá tuần/tháng, alert rising KOC)
 ```
 
-Chi tiết: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) ·
+Chi tiết kỹ thuật: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) ·
+Hướng dẫn sử dụng theo bộ phận (marketing/content/sales/CSKH): [docs/HUONG_DAN_SU_DUNG.md](docs/HUONG_DAN_SU_DUNG.md) ·
 Sổ tay nghiệp vụ: [docs/HANDBOOK_11_case_studies.html](docs/HANDBOOK_11_case_studies.html) ·
 Hướng dẫn build từng bước: [BUILD_GUIDE_ClaudeCode.md](BUILD_GUIDE_ClaudeCode.md)
+
+**Đang dùng AI coding assistant để phát triển tiếp?** Đọc [AGENTS.md](AGENTS.md) và
+[docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md) trước — có tiến trình, quyết định kỹ
+thuật, và các vấn đề môi trường đã gặp/đã xử lý.
 
 ## Quick start
 

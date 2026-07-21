@@ -2,6 +2,10 @@
 
 > File này là bộ nhớ dự án cho Claude Code. Đọc kỹ trước khi sinh/sửa code.
 > Repo: https://github.com/digiads68/MediaCrawler (bản v2 — đã tích hợp DigiAds Kit).
+>
+> **AI coding tool khác** (không phải Claude Code) → nội dung file này vẫn áp dụng, đọc
+> [`AGENTS.md`](AGENTS.md) trước để biết thứ tự đọc tài liệu và
+> [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md) để biết tiến trình/quyết định đã có.
 
 ## 1. Dự án là gì
 
