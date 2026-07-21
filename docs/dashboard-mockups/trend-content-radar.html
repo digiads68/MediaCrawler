@@ -1,0 +1,372 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>Trend &amp; Content Radar — Báo cáo tuần 29</title>
+<style>
+  :root{
+    color-scheme: light;
+    --page:#eceee7; --surface:#f7f8f3; --surface-2:#eef0ea;
+    --ink:#16211f; --ink-2:#4b5850; --muted:#7c8880; --rule:#d7dbd1;
+    --accent:#eb6834; --accent-ink:#1a0f08;
+    --good:#0ca30c; --warning:#fab219; --critical:#d03b3b;
+    --c-blue:#2a78d6; --c-green:#008300; --c-magenta:#e87ba4;
+    --c-yellow:#eda100; --c-aqua:#1baf7a; --c-violet:#4a3aa7;
+    --shadow: 0 1px 0 rgba(22,33,31,.05);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:where(:not([data-theme="light"])){
+      color-scheme: dark;
+      --page:#0d1311; --surface:#121917; --surface-2:#17201d;
+      --ink:#eef1ec; --ink-2:#c3ccc6; --muted:#85938c; --rule:#26332f;
+      --accent:#d95926; --accent-ink:#120a05;
+      --c-blue:#3987e5; --c-green:#008300; --c-magenta:#d55181;
+      --c-yellow:#c98500; --c-aqua:#199e70; --c-violet:#9085e9;
+      --shadow: 0 1px 0 rgba(0,0,0,.4);
+    }
+  }
+  :root[data-theme="dark"]{
+    color-scheme: dark;
+    --page:#0d1311; --surface:#121917; --surface-2:#17201d;
+    --ink:#eef1ec; --ink-2:#c3ccc6; --muted:#85938c; --rule:#26332f;
+    --accent:#d95926; --accent-ink:#120a05;
+    --c-blue:#3987e5; --c-green:#008300; --c-magenta:#d55181;
+    --c-yellow:#c98500; --c-aqua:#199e70; --c-violet:#9085e9;
+  }
+  :root[data-theme="light"]{
+    color-scheme: light;
+    --page:#eceee7; --surface:#f7f8f3; --surface-2:#eef0ea;
+    --ink:#16211f; --ink-2:#4b5850; --muted:#7c8880; --rule:#d7dbd1;
+    --accent:#eb6834; --accent-ink:#1a0f08;
+    --c-blue:#2a78d6; --c-green:#008300; --c-magenta:#e87ba4;
+    --c-yellow:#eda100; --c-aqua:#1baf7a; --c-violet:#4a3aa7;
+  }
+
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--page); color:var(--ink);
+    font-family:"Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+    font-size:14px; line-height:1.45;
+    padding:28px; min-height:100vh;
+  }
+  .wrap{max-width:1180px; margin:0 auto; display:flex; flex-direction:column; gap:18px;}
+
+  .serif{font-family:Charter, "Iowan Old Style", "Palatino Linotype", Georgia, serif;}
+  .tnum{font-variant-numeric: tabular-nums;}
+
+  /* header */
+  .head{
+    display:flex; align-items:flex-end; justify-content:space-between; gap:24px;
+    border-bottom:2px solid var(--accent); padding-bottom:14px;
+  }
+  .head .eyebrow{
+    font-size:11px; letter-spacing:.09em; text-transform:uppercase; color:var(--accent);
+    font-weight:700; margin:0 0 6px;
+  }
+  .head h1{
+    margin:0; font-size:28px; font-weight:600; letter-spacing:-.01em;
+    text-wrap:balance;
+  }
+  .head .sub{margin:6px 0 0; color:var(--ink-2); font-size:13.5px;}
+  .head .meta{text-align:right; color:var(--muted); font-size:12.5px; white-space:nowrap;}
+  .head .meta b{color:var(--ink-2); font-weight:600;}
+
+  /* stat tiles */
+  .tiles{display:grid; grid-template-columns:repeat(4,1fr); gap:12px;}
+  .tile{
+    background:var(--surface); border:1px solid var(--rule); border-radius:6px;
+    padding:14px 16px; box-shadow:var(--shadow);
+  }
+  .tile .label{font-size:11.5px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em;}
+  .tile .value{font-size:26px; font-weight:600; margin-top:4px;}
+  .tile .value.serif{font-family:Charter, "Iowan Old Style", Georgia, serif;}
+  .tile .delta{font-size:12px; margin-top:3px; color:var(--ink-2);}
+  .tile .delta.good{color:var(--good);}
+
+  /* panels */
+  .row{display:grid; gap:14px;}
+  .row.split{grid-template-columns: 1.5fr 1fr;}
+  .panel{
+    background:var(--surface); border:1px solid var(--rule); border-radius:6px;
+    padding:16px 18px 14px; box-shadow:var(--shadow);
+  }
+  .panel h2{
+    margin:0 0 2px; font-size:14.5px; font-weight:700;
+  }
+  .panel .panel-sub{margin:0 0 12px; font-size:11.5px; color:var(--muted);}
+
+  /* ranked post list */
+  .post{
+    display:grid; grid-template-columns: 22px 1fr 74px; gap:10px;
+    align-items:center; padding:8px 0; border-top:1px solid var(--rule);
+  }
+  .post:first-child{border-top:none;}
+  .post .rank{color:var(--muted); font-size:12px; font-weight:700;}
+  .post .body .title{font-size:13px; color:var(--ink); margin:0 0 3px; text-wrap:balance;}
+  .post .body .tags{display:flex; gap:6px; align-items:center; font-size:11px; color:var(--muted);}
+  .tag{
+    border:1px solid var(--rule); border-radius:3px; padding:1px 6px;
+    font-size:10.5px; color:var(--ink-2); text-transform:uppercase; letter-spacing:.02em;
+  }
+  .metrics{display:flex; gap:10px; font-size:11px; color:var(--muted); margin-top:2px;}
+  .metrics b{color:var(--ink-2); font-weight:600;}
+  .scorewrap{display:flex; flex-direction:column; align-items:flex-end; gap:4px;}
+  .scorewrap .num{font-weight:700; font-size:15px;}
+  .barbg{width:70px; height:6px; background:var(--surface-2); border-radius:3px; overflow:hidden;}
+  .barfill{height:100%; background:var(--accent); border-radius:3px;}
+
+  /* format bars */
+  .fmt-row{display:grid; grid-template-columns:98px 1fr 40px; gap:8px; align-items:center; margin:9px 0;}
+  .fmt-row .name{font-size:12px; color:var(--ink-2);}
+  .fmt-bar-bg{height:14px; background:var(--surface-2); border-radius:3px; position:relative; overflow:hidden;}
+  .fmt-bar-fill{height:100%; border-radius:3px 4px 4px 3px;}
+  .fmt-row .val{font-size:12px; text-align:right; color:var(--ink);}
+  .legend-note{font-size:11px; color:var(--muted); margin-top:10px; border-top:1px solid var(--rule); padding-top:8px;}
+
+  /* table */
+  table{width:100%; border-collapse:collapse; font-size:12.5px;}
+  th{
+    text-align:left; font-size:10.5px; text-transform:uppercase; letter-spacing:.04em;
+    color:var(--muted); font-weight:600; padding:0 8px 6px 0; border-bottom:1px solid var(--rule);
+  }
+  td{padding:7px 8px 7px 0; border-bottom:1px solid var(--rule); color:var(--ink-2);}
+  tr:last-child td{border-bottom:none;}
+  td.num, th.num{text-align:right;}
+  td.strong{color:var(--ink); font-weight:600;}
+  .up{color:var(--good); font-weight:600;}
+  .sparkbar-bg{width:60px; height:6px; background:var(--surface-2); border-radius:3px; display:inline-block; vertical-align:middle; overflow:hidden;}
+  .sparkbar-fill{height:100%; background:var(--c-aqua); border-radius:3px;}
+
+  /* funnel */
+  .funnel{display:flex; align-items:stretch; gap:0; margin-top:8px;}
+  .fstep{flex:1; text-align:center; position:relative; padding:10px 6px;}
+  .fstep:not(:last-child)::after{
+    content:"→"; position:absolute; right:-11px; top:50%; transform:translateY(-50%);
+    color:var(--muted); font-size:14px;
+  }
+  .fstep .n{font-size:22px; font-weight:700; font-family:Charter,Georgia,serif;}
+  .fstep .l{font-size:10.5px; color:var(--muted); text-transform:uppercase; letter-spacing:.03em; margin-top:2px;}
+
+  footer{
+    border-top:1px solid var(--rule); padding-top:12px; margin-top:4px;
+    font-size:11.5px; color:var(--muted); display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px;
+  }
+  footer code{background:var(--surface-2); padding:1px 5px; border-radius:3px; font-size:11px;}
+
+  @media (max-width: 860px){
+    .tiles{grid-template-columns:repeat(2,1fr);}
+    .row.split{grid-template-columns:1fr;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="head">
+    <div>
+      <p class="eyebrow">CS1 · Trend Radar &nbsp;+&nbsp; CS10 · Sound Watchlist &nbsp;+&nbsp; CS5 · Angle Library</p>
+      <h1 class="serif">Trend &amp; Content Radar</h1>
+      <p class="sub">Ngách chăm sóc da dầu · Douyin + Xiaohongshu · 6 từ khoá theo dõi</p>
+    </div>
+    <div class="meta">
+      Tuần 29 · <b>14–20/07/2026</b><br>
+      Cập nhật lúc 07:04, Thứ 2 · nguồn: <b>WF_MC1</b>
+    </div>
+  </div>
+
+  <div class="tiles">
+    <div class="tile">
+      <div class="label">Bài đã quét</div>
+      <div class="value tnum">342</div>
+      <div class="delta">6 từ khoá × 2 nền tảng</div>
+    </div>
+    <div class="tile">
+      <div class="label">Điểm trend cao nhất</div>
+      <div class="value tnum serif">96.4</div>
+      <div class="delta">"7 ngày thay da dầu" · Douyin</div>
+    </div>
+    <div class="tile">
+      <div class="label">Format thắng thế</div>
+      <div class="value">Before–after</div>
+      <div class="delta">62% trong top 10 bài</div>
+    </div>
+    <div class="tile">
+      <div class="label">Sound mới nổi</div>
+      <div class="value tnum">3</div>
+      <div class="delta good">▲ dùng lại ≥2 lần/tuần</div>
+    </div>
+  </div>
+
+  <div class="row split">
+    <div class="panel">
+      <h2>Top bài theo điểm trend</h2>
+      <p class="panel-sub">trend_score = 0.4·save + 0.3·share + 0.2·comment + 0.1·like (chuẩn hoá 0–100)</p>
+
+      <div class="post">
+        <div class="rank tnum">01</div>
+        <div class="body">
+          <p class="title">"Da dầu mà vẫn bóng nhờn? 90% làm sai bước này"</p>
+          <div class="tags"><span class="tag">Douyin</span><span class="tag">before-after</span></div>
+          <div class="metrics tnum"><span>👍 <b>128.0K</b></span><span>💾 <b>31.0K</b></span><span>↗ <b>9.8K</b></span></div>
+        </div>
+        <div class="scorewrap">
+          <div class="num tnum">96.4</div>
+          <div class="barbg"><div class="barfill" style="width:100%"></div></div>
+        </div>
+      </div>
+
+      <div class="post">
+        <div class="rank tnum">02</div>
+        <div class="body">
+          <p class="title">"Trưa chưa tới mặt đã 'chảo dầu'? Xem 10 giây này"</p>
+          <div class="tags"><span class="tag">Xiaohongshu</span><span class="tag">review</span></div>
+          <div class="metrics tnum"><span>👍 <b>94.2K</b></span><span>💾 <b>26.4K</b></span><span>↗ <b>6.1K</b></span></div>
+        </div>
+        <div class="scorewrap">
+          <div class="num tnum">88.1</div>
+          <div class="barbg"><div class="barfill" style="width:91%"></div></div>
+        </div>
+      </div>
+
+      <div class="post">
+        <div class="rank tnum">03</div>
+        <div class="body">
+          <p class="title">"3 bước kiềm dầu buổi trưa — không cần rửa mặt lại"</p>
+          <div class="tags"><span class="tag">Douyin</span><span class="tag">tutorial</span></div>
+          <div class="metrics tnum"><span>👍 <b>81.7K</b></span><span>💾 <b>22.9K</b></span><span>↗ <b>5.4K</b></span></div>
+        </div>
+        <div class="scorewrap">
+          <div class="num tnum">82.6</div>
+          <div class="barbg"><div class="barfill" style="width:86%"></div></div>
+        </div>
+      </div>
+
+      <div class="post">
+        <div class="rank tnum">04</div>
+        <div class="body">
+          <p class="title">"Đập hộp serum mới — kiềm dầu 8 tiếng có đúng không?"</p>
+          <div class="tags"><span class="tag">Xiaohongshu</span><span class="tag">unboxing</span></div>
+          <div class="metrics tnum"><span>👍 <b>63.0K</b></span><span>💾 <b>15.2K</b></span><span>↗ <b>3.0K</b></span></div>
+        </div>
+        <div class="scorewrap">
+          <div class="num tnum">71.3</div>
+          <div class="barbg"><div class="barfill" style="width:74%"></div></div>
+        </div>
+      </div>
+
+      <div class="post">
+        <div class="rank tnum">05</div>
+        <div class="body">
+          <p class="title">"Đi làm 12 tiếng vẫn không bóng — team mình đã làm gì"</p>
+          <div class="tags"><span class="tag">Douyin</span><span class="tag">storytime</span></div>
+          <div class="metrics tnum"><span>👍 <b>58.4K</b></span><span>💾 <b>13.8K</b></span><span>↗ <b>2.7K</b></span></div>
+        </div>
+        <div class="scorewrap">
+          <div class="num tnum">65.9</div>
+          <div class="barbg"><div class="barfill" style="width:68%"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Format nào đang thắng</h2>
+      <p class="panel-sub">Số bài &amp; điểm trend trung bình mỗi dạng nội dung</p>
+
+      <div class="fmt-row">
+        <div class="name">Before–after</div>
+        <div class="fmt-bar-bg"><div class="fmt-bar-fill" style="width:100%; background:var(--c-blue)"></div></div>
+        <div class="val tnum">78.2</div>
+      </div>
+      <div class="fmt-row">
+        <div class="name">Review</div>
+        <div class="fmt-bar-bg"><div class="fmt-bar-fill" style="width:78%; background:var(--c-green)"></div></div>
+        <div class="val tnum">61.0</div>
+      </div>
+      <div class="fmt-row">
+        <div class="name">Tutorial</div>
+        <div class="fmt-bar-bg"><div class="fmt-bar-fill" style="width:65%; background:var(--c-magenta)"></div></div>
+        <div class="val tnum">51.4</div>
+      </div>
+      <div class="fmt-row">
+        <div class="name">Unboxing</div>
+        <div class="fmt-bar-bg"><div class="fmt-bar-fill" style="width:52%; background:var(--c-yellow)"></div></div>
+        <div class="val tnum">41.2</div>
+      </div>
+      <div class="fmt-row">
+        <div class="name">Storytime</div>
+        <div class="fmt-bar-bg"><div class="fmt-bar-fill" style="width:46%; background:var(--c-aqua)"></div></div>
+        <div class="val tnum">36.5</div>
+      </div>
+      <div class="fmt-row">
+        <div class="name">POV/skit</div>
+        <div class="fmt-bar-bg"><div class="fmt-bar-fill" style="width:29%; background:var(--c-violet)"></div></div>
+        <div class="val tnum">23.1</div>
+      </div>
+
+      <p class="legend-note">→ Ưu tiên brief theo <b style="color:var(--ink)">before-after</b> &amp;
+      <b style="color:var(--ink)">review</b> tuần này — 2 dạng đang có điểm trend TB cao nhất.</p>
+    </div>
+  </div>
+
+  <div class="row split">
+    <div class="panel">
+      <h2>Sound watchlist — nhạc đang lên</h2>
+      <p class="panel-sub">CS10 · chỉ dùng lại qua thư viện nhạc hợp lệ, không bê file gốc</p>
+      <table>
+        <thead>
+          <tr><th>Sound ref</th><th class="num">Tuần này</th><th class="num">Tuần trước</th><th class="num">Velocity</th><th>Xu hướng</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="strong">snd_A · remix nhịp nhanh</td>
+            <td class="num tnum">14</td><td class="num tnum">6</td>
+            <td class="num tnum up">2.33×</td>
+            <td><span class="sparkbar-bg"><span class="sparkbar-fill" style="width:95%"></span></span></td>
+          </tr>
+          <tr>
+            <td class="strong">snd_B · piano lo-fi</td>
+            <td class="num tnum">9</td><td class="num tnum">5</td>
+            <td class="num tnum up">1.80×</td>
+            <td><span class="sparkbar-bg"><span class="sparkbar-fill" style="width:74%"></span></span></td>
+          </tr>
+          <tr>
+            <td class="strong">snd_C · beat drop 0.8s</td>
+            <td class="num tnum">7</td><td class="num tnum">4</td>
+            <td class="num tnum up">1.75×</td>
+            <td><span class="sparkbar-bg"><span class="sparkbar-fill" style="width:68%"></span></span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="panel">
+      <h2>Angle Library → Video Brief</h2>
+      <p class="panel-sub">CS5 · pipeline 6 bước (Claude), tuần này</p>
+      <div class="funnel">
+        <div class="fstep">
+          <div class="n tnum">38</div>
+          <div class="l">Angle đã lọc<br>(top 20% trend)</div>
+        </div>
+        <div class="fstep">
+          <div class="n tnum">12</div>
+          <div class="l">Đã sinh<br>Video Brief</div>
+        </div>
+        <div class="fstep">
+          <div class="n tnum" style="color:var(--good)">5</div>
+          <div class="l">Verdict<br>"ship"</div>
+        </div>
+      </div>
+      <p class="legend-note">5 brief đủ điểm hook (≥7/10) — sẵn giao Production. 7 brief còn lại
+      ở trạng thái <b style="color:var(--warning)">revise</b> (cần chỉnh hook/CTA).</p>
+    </div>
+  </div>
+
+  <footer>
+    <span>Nguồn: MediaCrawler + DigiAds Kit (<code>kit/analyzer trend</code>) · dữ liệu công khai, nghiên cứu nội bộ</span>
+    <span>Minh hoạ báo cáo — số liệu mẫu, không phải dữ liệu thật</span>
+  </footer>
+
+</div>
+</body>
+</html>
