@@ -6,7 +6,9 @@ export function MainContent() {
   useLogWebSocket()
 
   return (
-    <main className="flex-1 flex flex-col overflow-hidden min-h-0 relative z-10">
+    // min-h dam bao Terminal (chua nut mo Data Explorer / PAYLOAD_MATRIX)
+    // khong bao gio bi flexbox ep xuong 0px khi CrawlerConfigPanel cao.
+    <main className="flex-1 flex flex-col overflow-hidden min-h-[360px] relative z-10">
       <Terminal />
     </main>
   )

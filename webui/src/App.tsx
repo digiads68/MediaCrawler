@@ -43,8 +43,11 @@ function App() {
       {/* Header Bar */}
       <Sidebar onShowDisclaimer={handleShowDisclaimer} />
 
-      {/* Main Area */}
-      <div className="flex-1 flex flex-col gap-4 p-4 overflow-hidden min-h-0">
+      {/* Main Area — overflow-y-auto (not hidden): tren man hinh thap, config
+          panel + terminal co the cao hon viewport. Truoc day overflow-hidden
+          khien Terminal (chua nut mo Data Explorer) bi ep ve 0px, khong co
+          cach nao cuon xuong de thay. */}
+      <div className="flex-1 flex flex-col gap-4 p-4 overflow-y-auto min-h-0">
         {/* Config Panel - Primary Action Area (Always Expanded) */}
         <div className="flex-shrink-0">
           <CrawlerConfigPanel />

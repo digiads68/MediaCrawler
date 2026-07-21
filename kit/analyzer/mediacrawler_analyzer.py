@@ -104,7 +104,10 @@ def trend_radar(df: pd.DataFrame, top: int = 20) -> dict:
     d["trend_score"] = (d["_collected_count"] + d["_share_count"]
                         + d["_comment_count"] + d["_liked_count"]) * 100
     cols = [c for c in ["title", "format", "source_keyword", "liked_count",
-                        "collected_count", "share_count", "trend_score",
+                        "collected_count", "share_count", "comment_count",
+                        "trend_score", "save_rate", "share_rate",
+                        "nickname", "created_at", "cover_url",
+                        "music_download_url",
                         "aweme_url", "note_url", "video_url"] if c in d.columns]
     top_posts = d.sort_values("trend_score", ascending=False).head(top)[cols]
 

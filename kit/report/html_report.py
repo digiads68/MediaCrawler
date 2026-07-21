@@ -112,6 +112,188 @@ def _table(df: pd.DataFrame, *, max_rows: int = 50, drop: tuple[str, ...] = ()) 
             f'<tbody>{"".join(body)}</tbody></table></div>{more}')
 
 
+def _pick_url_col(df: pd.DataFrame) -> str | None:
+    for c in ("aweme_url", "note_url", "video_url"):
+        if c in df.columns:
+            return c
+    return None
+
+
+def _pct(v: object) -> str:
+    try:
+        return f"{float(v) * 100:.0f}%"
+    except (ValueError, TypeError):
+        return "—"
+
+
+def _media_grid(df: pd.DataFrame, *, grid_id: str = "mg", max_cards: int = 60) -> str:
+    """
+    Lưới thẻ video cho nghiên cứu trend / lấy ý tưởng (clone).
+
+    Mỗi thẻ: ảnh cover (fallback nếu vỡ/thiếu), rank + điểm trend, hook đầy đủ
+    (thu gọn/mở rộng), 4 chỉ số + save-rate/share-rate, tên tác giả + ngày,
+    nút "Copy hook" và "Xem video". Có toolbar sort/filter format/tìm kiếm
+    (JS thuần, không thư viện — chạy được khi mở file offline).
+    """
+    if df is None or df.empty:
+        return '<p class="muted">Không có dữ liệu.</p>'
+    url_col = _pick_url_col(df)
+    d = df.head(max_cards).reset_index(drop=True)
+    formats = sorted({str(f) for f in d.get("format", pd.Series(dtype=str)).dropna().unique()})
+
+    chips = [f'<button class="fchip active" type="button" data-fmt="__all__">Tất cả '
+             f'({len(d)})</button>']
+    for fmt in formats:
+        n = int((d["format"] == fmt).sum())
+        chips.append(f'<button class="fchip" type="button" data-fmt="{_esc(fmt)}">'
+                     f'{_esc(fmt)} ({n})</button>')
+
+    cards = []
+    for i, r in d.iterrows():
+        title = str(r.get("title", "") or "")
+        fmt = str(r.get("format", "") or "khác")
+        kw = str(r.get("source_keyword", "") or "")
+        like = float(r.get("liked_count", 0) or 0)
+        save = float(r.get("collected_count", 0) or 0)
+        share = float(r.get("share_count", 0) or 0)
+        comment = float(r.get("comment_count", 0) or 0)
+        score = float(r.get("trend_score", 0) or 0)
+        url = str(r.get(url_col, "") or "") if url_col else ""
+        cover = str(r.get("cover_url", "") or "")
+        nickname = str(r.get("nickname", "") or "")
+        created = r.get("created_at")
+        created_s = "" if pd.isna(created) else str(created)[:10]
+        music = str(r.get("music_download_url", "") or "")
+
+        thumb = (
+            f'<a class="mcard-thumb" href="{_esc(url)}" target="_blank" rel="noopener">'
+            f'<img src="{_esc(cover)}" loading="lazy" alt="" '
+            f'onerror="this.closest(\'.mcard-thumb\').classList.add(\'mcard-thumb--broken\')">'
+            f'<span class="mcard-play">▶</span>'
+            f'<span class="mcard-rank">#{i + 1}</span>'
+            f'<span class="mcard-score">{score:.0f}</span></a>'
+            if url else
+            f'<div class="mcard-thumb mcard-thumb--broken">'
+            f'<span class="mcard-rank">#{i + 1}</span>'
+            f'<span class="mcard-score">{score:.0f}</span></div>'
+        )
+
+        meta_bits = [b for b in [_esc(nickname), _esc(created_s)] if b]
+        if music:
+            meta_bits.append(f'<a href="{_esc(music)}" target="_blank" '
+                             f'rel="noopener">🎵 nhạc</a>')
+        meta = " · ".join(meta_bits)
+
+        actions = (f'<a class="mcard-open" href="{_esc(url)}" target="_blank" '
+                   f'rel="noopener">▶ Xem video</a>' if url else "")
+        kw_tag = f'<span class="tag tag-kw">{_esc(kw)}</span>' if kw else ""
+        meta_div = f'<div class="mcard-meta">{meta}</div>' if meta else ""
+
+        cards.append(
+            f'<article class="mcard" data-format="{_esc(fmt)}" '
+            f'data-hook-lc="{_esc(title.lower())}" data-trend="{score}" '
+            f'data-like="{like}" data-save="{save}" data-share="{share}" '
+            f'data-comment="{comment}">'
+            f'{thumb}'
+            f'<div class="mcard-body">'
+            f'<div class="mcard-tags"><span class="tag">{_esc(fmt)}</span>{kw_tag}</div>'
+            f'<p class="mcard-hook">{_esc(title)}</p>'
+            f'<button class="mcard-more" type="button">Xem đầy đủ ▾</button>'
+            f'<div class="mcard-stats">'
+            f'<span title="Like">👍 {charts._fmt(like)}</span>'
+            f'<span title="Save">💾 {charts._fmt(save)}</span>'
+            f'<span title="Share">↗ {charts._fmt(share)}</span>'
+            f'<span title="Bình luận">💬 {charts._fmt(comment)}</span></div>'
+            f'<div class="mcard-rates">'
+            f'<span>Save/Like: <b>{_pct(r.get("save_rate"))}</b></span>'
+            f'<span>Share/Like: <b>{_pct(r.get("share_rate"))}</b></span></div>'
+            f'{meta_div}'
+            f'<div class="mcard-actions">'
+            f'<button class="btn-copy" type="button" data-copy="{_esc(title)}">'
+            f'📋 Copy hook</button>{actions}</div>'
+            f'</div></article>'
+        )
+
+    more_note = (f'<p class="muted tbl-more">Đang hiện {len(d)} bài top — '
+                f'tải file Excel để xem đầy đủ.</p>' if len(df) > max_cards else "")
+
+    return f"""
+<div class="grid-toolbar">
+  <input type="search" id="{grid_id}-search" placeholder="Tìm trong hook…" class="mg-search">
+  <select id="{grid_id}-sort" class="mg-sort">
+    <option value="trend">Sắp theo: Điểm trend</option>
+    <option value="like">Like</option>
+    <option value="save">Save</option>
+    <option value="share">Share</option>
+    <option value="comment">Bình luận</option>
+  </select>
+  <div class="chip-row" id="{grid_id}-chips">{"".join(chips)}</div>
+</div>
+<div class="mcard-grid" id="{grid_id}-grid">{"".join(cards)}</div>
+{more_note}
+<script>
+(function(){{
+  var grid = document.getElementById("{grid_id}-grid");
+  var search = document.getElementById("{grid_id}-search");
+  var sortSel = document.getElementById("{grid_id}-sort");
+  var chipRow = document.getElementById("{grid_id}-chips");
+  var activeFmt = "__all__";
+
+  function apply() {{
+    var q = (search.value || "").toLowerCase();
+    Array.prototype.forEach.call(grid.children, function(card) {{
+      var fmt = card.getAttribute("data-format");
+      var hook = card.getAttribute("data-hook-lc") || "";
+      var show = (activeFmt === "__all__" || fmt === activeFmt) &&
+                 (!q || hook.indexOf(q) !== -1);
+      card.style.display = show ? "" : "none";
+    }});
+  }}
+  function sortBy(key) {{
+    var cards = Array.prototype.slice.call(grid.children);
+    cards.sort(function(a, b) {{
+      return parseFloat(b.getAttribute("data-" + key) || 0) -
+             parseFloat(a.getAttribute("data-" + key) || 0);
+    }});
+    cards.forEach(function(c) {{ grid.appendChild(c); }});
+  }}
+  chipRow.addEventListener("click", function(e) {{
+    var chip = e.target.closest(".fchip");
+    if (!chip) return;
+    Array.prototype.forEach.call(chipRow.children, function(c) {{
+      c.classList.remove("active");
+    }});
+    chip.classList.add("active");
+    activeFmt = chip.getAttribute("data-fmt");
+    apply();
+  }});
+  search.addEventListener("input", apply);
+  sortSel.addEventListener("change", function() {{ sortBy(sortSel.value); }});
+  grid.addEventListener("click", function(e) {{
+    var copyBtn = e.target.closest(".btn-copy");
+    if (copyBtn) {{
+      var text = copyBtn.getAttribute("data-copy") || "";
+      if (navigator.clipboard) {{
+        navigator.clipboard.writeText(text).then(function() {{
+          var old = copyBtn.textContent;
+          copyBtn.textContent = "✓ Đã copy";
+          setTimeout(function() {{ copyBtn.textContent = old; }}, 1500);
+        }});
+      }}
+      return;
+    }}
+    var moreBtn = e.target.closest(".mcard-more");
+    if (moreBtn) {{
+      var hookEl = moreBtn.previousElementSibling;
+      hookEl.classList.toggle("mcard-hook--expanded");
+      moreBtn.textContent = hookEl.classList.contains("mcard-hook--expanded")
+        ? "Thu gọn ▴" : "Xem đầy đủ ▾";
+    }}
+  }});
+}})();
+</script>"""
+
+
 def _tiles(items: list[tuple[str, str, str]]) -> str:
     """KPI tiles: [(nhãn, giá trị, ghi chú)]."""
     cells = []
@@ -177,7 +359,8 @@ def _report_trend(result: dict, df: pd.DataFrame | None) -> tuple[str, list, str
                      f'<div class="chart-grid-2">{donut}{bar}</div>')]
     if kwline:
         body.append(_section("Chỉ số theo từ khoá", kwline))
-    body.append(_section("Top bài theo điểm trend (kèm link video)", _table(top, max_rows=20)))
+    body.append(_section("Top bài theo điểm trend — lấy ý tưởng / clone",
+                         _media_grid(top, grid_id="trend")))
     if len(sounds):
         body.append(_section("Sound watchlist — nhạc đang lên", _table(sounds, max_rows=15)))
     return "".join(body), ["CS1_trend_top_posts.xlsx", "CS1_trend_formats.xlsx"], "Trend Radar"
@@ -437,6 +620,61 @@ a:hover{text-decoration:underline}
 .chip-warn{background:var(--warn);color:#160d02}
 .chip-muted{background:var(--surface-2);color:var(--muted);border:1px solid var(--rule)}
 footer{border-top:1px solid var(--rule);padding-top:11px;font-size:11px;color:var(--muted)}
+
+/* --- Media grid (nghien cuu trend / clone y tuong) --- */
+.grid-toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+.mg-search{flex:1;min-width:180px;background:var(--surface-2);border:1px solid var(--rule);
+ border-radius:5px;padding:7px 10px;font-size:12.5px;color:var(--ink);font-family:inherit}
+.mg-search::placeholder{color:var(--muted)}
+.mg-sort{background:var(--surface-2);border:1px solid var(--rule);border-radius:5px;
+ padding:7px 10px;font-size:12.5px;color:var(--ink);font-family:inherit}
+.chip-row{display:flex;gap:6px;flex-wrap:wrap}
+.fchip{background:var(--surface-2);border:1px solid var(--rule);border-radius:12px;
+ padding:5px 12px;font-size:11.5px;color:var(--ink-2);cursor:pointer;font-family:inherit;
+ white-space:nowrap}
+.fchip.active{background:var(--accent);color:var(--accent-ink,#1a0f08);border-color:var(--accent);
+ font-weight:700}
+.mcard-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px}
+.mcard{background:var(--surface-2);border:1px solid var(--rule);border-radius:8px;overflow:hidden;
+ display:flex;flex-direction:column}
+.mcard-thumb{position:relative;display:block;aspect-ratio:9/12;background:
+ linear-gradient(135deg,var(--surface-2),var(--rule));overflow:hidden;text-decoration:none}
+.mcard-thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.mcard-thumb--broken img{display:none}
+.mcard-thumb--broken::before{content:"🎬";position:absolute;inset:0;display:flex;
+ align-items:center;justify-content:center;font-size:34px;opacity:.35}
+.mcard-play{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+ font-size:26px;color:#fff;background:rgba(0,0,0,0);opacity:0;transition:opacity .15s}
+.mcard-thumb:hover .mcard-play{opacity:1;background:rgba(0,0,0,.35)}
+.mcard-rank{position:absolute;top:6px;left:6px;background:rgba(0,0,0,.65);color:#fff;
+ font-size:10.5px;font-weight:700;padding:2px 7px;border-radius:10px}
+.mcard-score{position:absolute;top:6px;right:6px;background:var(--accent);color:var(--accent-ink,#1a0f08);
+ font-size:11px;font-weight:800;padding:2px 8px;border-radius:10px;
+ font-variant-numeric:tabular-nums}
+.mcard-body{padding:10px 12px 12px;display:flex;flex-direction:column;gap:7px;flex:1}
+.mcard-tags{display:flex;gap:5px;flex-wrap:wrap}
+.mcard-tags .tag{font-size:10px;border:1px solid var(--rule);border-radius:3px;padding:1px 6px;
+ color:var(--ink-2);text-transform:uppercase;letter-spacing:.02em}
+.mcard-tags .tag-kw{color:var(--accent);border-color:var(--accent)}
+.mcard-hook{font-size:12.5px;color:var(--ink);margin:0;line-height:1.4;
+ display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.mcard-hook--expanded{-webkit-line-clamp:unset;overflow:visible}
+.mcard-more{align-self:flex-start;background:none;border:none;color:var(--accent);
+ font-size:11px;font-weight:600;cursor:pointer;padding:0;font-family:inherit}
+.mcard-stats{display:flex;gap:9px;flex-wrap:wrap;font-size:11.5px;color:var(--ink-2);
+ font-variant-numeric:tabular-nums}
+.mcard-rates{display:flex;gap:12px;font-size:11px;color:var(--muted)}
+.mcard-rates b{color:var(--ink-2);font-variant-numeric:tabular-nums}
+.mcard-meta{font-size:11px;color:var(--muted);display:flex;gap:4px;flex-wrap:wrap}
+.mcard-meta a{color:var(--muted);font-weight:400}
+.mcard-actions{display:flex;gap:8px;margin-top:auto;padding-top:4px}
+.btn-copy{background:var(--surface);border:1px solid var(--rule);border-radius:5px;
+ padding:5px 9px;font-size:11px;color:var(--ink-2);cursor:pointer;font-family:inherit}
+.btn-copy:hover{border-color:var(--accent);color:var(--accent)}
+.mcard-open{background:var(--accent);color:var(--accent-ink,#1a0f08);border-radius:5px;
+ padding:5px 10px;font-size:11px;font-weight:700;text-decoration:none}
+
 @media(max-width:800px){.tiles{grid-template-columns:repeat(2,1fr)}
- .chart-grid-2{grid-template-columns:1fr}}
+ .chart-grid-2{grid-template-columns:1fr}
+ .mcard-grid{grid-template-columns:repeat(auto-fill,minmax(160px,1fr))}}
 """
