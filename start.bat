@@ -156,4 +156,11 @@ echo.
 
 "%VENV_PY%" -m uvicorn api.main:app --host 0.0.0.0 --port 8080
 
+echo.
+echo ============================================================
+echo   Server da dung (nhan Ctrl+C hoac gap loi ben tren).
+echo   Neu vua thay dong loi mau do, doc ky va bao lai cho nguoi ho tro.
+echo ============================================================
+pause
+
 endlocal
