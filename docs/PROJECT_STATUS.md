@@ -69,6 +69,7 @@ trong n8n), 5 file `kit/templates/*.xlsx`.
 | `kit/enrich` | ✅ | ✅ `test_enrich.py` | Dùng bởi analyzer | `translate_zh_vi` cần `ANTHROPIC_API_KEY` khi provider=claude |
 | `kit/storage` (schema/writer/checkpoint) | ✅ | ✅ `test_storage.py`, `test_checkpoint.py` | Cờ `--to supabase` | Schema **chưa deploy** lên Supabase thật nào — chỉ có SQL sẵn |
 | `kit/pipeline` | ✅ | ✅ `test_pipeline.py` | CLI + `/kit/angle-brief` | provider=claude chưa chạy thật với API key thật trong session này |
+| `kit/report` | ✅ | ✅ `test_report.py` (12 test) | Gọi từ `_run_analyzer`, phục vụ qua `/kit/reports/{name}` | **Mới**: sinh báo cáo HTML tự chứa (donut/hbar/line SVG server-side, link video, palette dataviz đã validate). Đã chạy thật trên data douyin + verify UI end-to-end |
 | `kit/webhook` | ✅ | ✅ `test_webhook.py` | Cờ `--notify` | Chưa test với `NOTIFY_WEBHOOK_URL` thật (n8n) |
 | `kit/queue` (arq) | ✅ | ✅ `test_tasks.py` | CLI enqueue + worker | **Chưa chạy thật với Redis** — chỉ test bằng mock |
 | `api/routers/kit.py` | ✅ | ✅ `test_api_kit.py` | Mount trong `api/main.py` | Đã xác nhận hiện đúng trong OpenAPI `/docs` |
@@ -190,6 +191,22 @@ gắn với tài khoản KHÁC (không có quyền trên repo đích). Xoá 2 en
 Credential Manager (`cmdkey /delete:...` — cẩn thận target có khoảng trắng cần P/Invoke
 `CredDelete` vì `cmdkey` xử lý sai cú pháp) rồi push lại để Git Credential Manager xác thực
 lại đúng tài khoản.
+
+### 5.9. `.venv` đồng bộ qua OneDrive từ máy khác → hỏng (đường dẫn Python máy cũ)
+
+Dự án nằm trong thư mục **OneDrive**. Khi tạo `.venv` trên máy A rồi OneDrive đồng bộ
+sang máy B, `.venv/pyvenv.cfg` vẫn trỏ `home`/`executable` về đường dẫn Python của **máy
+A** (VD `C:\Program Files\Python312` của user `HiepChoc`) — máy B không có đường dẫn đó
+nên `.venv\Scripts\python.exe` báo `No Python at '...'` và **mọi lệnh python/pytest/uvicorn
+qua venv đều chết**. Đây nhiều khả năng là gốc rễ lỗi "chạy máy khác không truy cập được
+localhost:8080": `start.bat` (bản cũ) thấy thư mục `.venv` tồn tại nên bỏ qua bước tạo,
+rồi uvicorn chạy bằng python venv hỏng → server không lên.
+
+**Đã xử lý:** `start.bat` giờ **chạy thử** `.venv\Scripts\python.exe -c "import sys"`;
+nếu lỗi (venv hỏng/đồng bộ từ máy khác) thì **xoá và tạo lại venv** tự động, rồi cài lại
+dependencies. **Đừng chỉ kiểm tra `if exist .venv` — phải chạy thử interpreter.** Cân nhắc
+loại `.venv/` khỏi phạm vi đồng bộ OneDrive (right-click → Free up space / Always keep on
+this device không giải quyết; cần loại hẳn khỏi thư mục sync hoặc dùng repo ngoài OneDrive).
 
 ### 5.8. Không có chế độ "hot list" chính thức của nền tảng
 

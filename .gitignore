@@ -187,6 +187,8 @@ database/*.db
 # DigiAds Kit outputs
 kit/**/reports/
 kit/pipeline/out/
+# Báo cáo analyzer xuất ra (Excel + HTML) — artefact runtime, không commit
+/reports/
 
 # Local tool/editor config (Claude Code preview, v.v.) — không phải phần source
 .claude/

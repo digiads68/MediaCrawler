@@ -21,6 +21,11 @@ export default defineConfig({
         changeOrigin: true,
         ws: true,  // 启用 WebSocket 代理
       },
+      // DigiAds Kit mount ở gốc /kit (analyze + reports)
+      '/kit': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+      },
     },
   },
 })

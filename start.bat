@@ -25,20 +25,32 @@ exit /b 1
 :have_python
 
 REM ---------------------------------------------------------------
-REM 2. Tao virtual environment (neu chua co)
+REM 2. Tao / kiem tra virtual environment
+REM    Quan trong: .venv dong bo qua OneDrive tu MAY KHAC se hong
+REM    (pyvenv.cfg tro ve duong dan Python may cu). Vi vay khong chi
+REM    kiem tra ton tai thu muc - phai chay thu; hong thi tao lai.
 REM ---------------------------------------------------------------
-if exist ".venv\Scripts\python.exe" goto :venv_ready
+if not exist ".venv\Scripts\python.exe" goto :venv_create
+".venv\Scripts\python.exe" -c "import sys" >nul 2>nul
+if errorlevel 1 goto :venv_broken
+echo [1/6] Virtual environment - OK.
+goto :venv_done
+
+:venv_broken
+echo [1/6] .venv hong (co the do dong bo tu may khac) - tao lai...
+rmdir /s /q ".venv" >nul 2>nul
+goto :venv_make
+
+:venv_create
 echo [1/6] Tao virtual environment...
+
+:venv_make
 %PY_CMD% -m venv .venv
 if errorlevel 1 (
     echo [LOI] Tao venv that bai.
     pause
     exit /b 1
 )
-goto :venv_done
-
-:venv_ready
-echo [1/6] Virtual environment - OK.
 
 :venv_done
 set VENV_PY=.venv\Scripts\python.exe

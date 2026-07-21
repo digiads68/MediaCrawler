@@ -183,8 +183,32 @@ khớp đường dẫn máy chủ thật, đặt biến môi trường `ANTHROPI
 
 ## PHẦN 4 — Các dạng báo cáo & dashboard
 
-Có **3 lớp báo cáo**, từ thô tới đẹp — chọn đúng lớp theo nhu cầu, đừng đợi lớp đẹp nhất
+Có **4 lớp báo cáo**, từ thô tới đẹp — chọn đúng lớp theo nhu cầu, đừng đợi lớp đẹp nhất
 cho mọi việc (mất công vô ích cho báo cáo dùng 1 lần).
+
+### 4.0. Phân tích ngay trong WebUI + báo cáo HTML (dễ nhất — KHÔNG cần command line)
+
+Đây là cách nhanh nhất cho người không rành kỹ thuật:
+
+1. Sau khi crawl xong, mở **PAYLOAD_MATRIX** (nút trên WebUI) để xem danh sách file đã cào.
+2. Trên mỗi file có nút **"Phân tích"** → bấm vào.
+3. Chọn **loại phân tích** (Trend Radar / KOC / SOV / Opportunity / Seasonal / Price /
+   Voice of Customer / Angle) → bấm **"Chạy phân tích"** (10–60 giây).
+   - Riêng **SOV** cần điền đường dẫn `brand_map.json` (mặc định `kit/config/brand_map.json`).
+4. Xong sẽ hiện **danh sách file báo cáo**:
+   - **Báo cáo HTML** → bấm *"Mở báo cáo"* → mở tab mới, xem ngay (biểu đồ + bảng + link video).
+   - **File Excel** → bấm *"Tải về"* để chỉnh/gửi khách.
+
+**Báo cáo HTML tự chứa** này (mới) gồm — tuỳ loại phân tích:
+- **KPI tiles** (số bài, điểm cao nhất, format thắng thế, sound nổi…).
+- **Biểu đồ tròn (donut) cơ cấu** — VD cơ cấu format, cơ cấu verdict KOC, share of voice.
+- **Biểu đồ đường (line)** — VD chỉ số (like/save/share/bình luận) theo từng từ khoá,
+  SOV theo tuần, engagement theo tuần (seasonal).
+- **Biểu đồ thanh** — điểm trend TB theo format, top creator theo điểm…
+- **Bảng chi tiết kèm link ▶ Xem video** và đầy đủ chỉ số (like/save/share/điểm).
+
+Báo cáo HTML mở offline được (tự chứa CSS + biểu đồ SVG, không cần mạng), in ra PDF đẹp,
+tự đổi sáng/tối theo hệ thống — tiện gửi cho khách hoặc lưu hồ sơ chiến dịch.
 
 ### 4.1. Excel thô — xuất trực tiếp từ analyzer (nhanh nhất)
 

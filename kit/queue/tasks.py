@@ -35,6 +35,8 @@ def _run_analyzer(command: str, file_path: str, to_supabase: bool = False,
     """Chạy 1 lệnh analyzer trên file dữ liệu (đồng bộ, pandas)."""
     import json
 
+    import pandas as pd
+
     from kit.analyzer import mediacrawler_analyzer as an
 
     if command not in ANALYZE_COMMANDS:
@@ -58,32 +60,50 @@ def _run_analyzer(command: str, file_path: str, to_supabase: bool = False,
         from kit.storage.supabase_writer import SupabaseWriter
         writer = SupabaseWriter(dry_run=dry_run)
 
+    # Kết quả analyzer + danh sách file Excel đã xuất (để sinh HTML + trả về UI).
+    # report_data: object truyền cho tầng báo cáo (dict cho trend, DataFrame khác).
     rows = 0
+    report_data: Any = None
+    xlsx_files: list[str] = []
     if command == "trend":
         res = an.trend_radar(df)
         rows = len(res["top_posts"])
+        report_data = res
+        xlsx_files = ["CS1_trend_top_posts.xlsx", "CS1_trend_formats.xlsx"]
+        if len(res.get("sounds", [])):
+            xlsx_files.append("CS10_sound_watchlist.xlsx")
         if writer:
             writer.upsert_trend_posts(res["top_posts"])
         if notify:
             from kit.webhook import notify_trend_brief
             notify_trend_brief(f"Trend radar xong: {rows} bài top.")
     elif command == "insight":
-        rows = len(an.comment_bank(df))
+        report_data = an.comment_bank(df)
+        rows = len(report_data)
+        xlsx_files = ["CS2_comment_bank.xlsx"]
     elif command == "koc":
         s = an.koc_scorecard(df)
         rows = len(s)
+        report_data = s
+        xlsx_files = ["CS3_koc_scorecard.xlsx", "CS9_rising_creators.xlsx"]
         if writer and rows:
             writer.upsert_koc(s)
         if notify and rows:
             from kit.webhook import notify_rising_koc
             notify_rising_koc(s[s["rising"]].to_dict(orient="records"))
     elif command == "opportunity":
-        rows = len(an.opportunity_map(df))
+        report_data = an.opportunity_map(df)
+        rows = len(report_data)
+        xlsx_files = ["CS6_opportunity_map.xlsx"]
     elif command == "seasonal":
-        rows = len(an.seasonal_radar(df))
+        report_data = an.seasonal_radar(df)
+        rows = len(report_data)
+        xlsx_files = ["CS7_seasonal_radar.xlsx"]
     elif command == "price":
         p = an.price_intel(df)
         rows = len(p)
+        report_data = p
+        xlsx_files = ["CS8_price_intel.xlsx"]
         if writer and rows:
             writer.upsert_price(p)
     elif command == "angle":
@@ -91,22 +111,37 @@ def _run_analyzer(command: str, file_path: str, to_supabase: bool = False,
         with open(out, encoding="utf-8") as f:
             records = [json.loads(line) for line in f if line.strip()]
         rows = len(records)
+        report_data = pd.DataFrame(records) if records else pd.DataFrame()
+        xlsx_files = ["angle_library.jsonl"]
         if writer:
             writer.upsert_angles(records)
     elif command == "sov":
         bm = json.loads(Path(brand_map).read_text(encoding="utf-8")) if brand_map else {}
         g = an.sov(df, bm)
         rows = len(g)
+        report_data = g
+        xlsx_files = ["CS11_sov_weekly.xlsx"]
         if writer and rows:
             writer.upsert_sov(g)
         if notify:
             from kit.webhook import notify_sov_updated
             notify_sov_updated()
 
+    # Sinh báo cáo HTML tự chứa (không chặn job nếu lỗi — chỉ log cảnh báo)
+    reports = list(xlsx_files)
+    try:
+        from kit.report import build_report
+        html_path = build_report(command, report_data, df=df,
+                                  meta={"keyword": keyword, "platform": platform,
+                                        "source_file": Path(file_path).name})
+        reports.append(html_path.name)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Không sinh được báo cáo HTML (%s): %s", command, exc)
+
     if ckpt_store is not None:
         from kit.storage.checkpoint import commit_checkpoint
         commit_checkpoint(df, ckpt_new_ids, ckpt_store, platform, keyword)
-    return {"command": command, "rows": rows, "file": file_path}
+    return {"command": command, "rows": rows, "file": file_path, "reports": reports}
 
 
 async def _wait_until_idle(client: httpx.AsyncClient, poll_interval: float,

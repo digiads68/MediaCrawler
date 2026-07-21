@@ -90,6 +90,33 @@ export const configApi = {
     }>('/config/options'),
 }
 
+// DigiAds Kit — phân tích 11 case + báo cáo
+export type KitCommand =
+  | 'trend' | 'insight' | 'koc' | 'opportunity'
+  | 'seasonal' | 'price' | 'sov' | 'angle'
+
+export interface KitAnalyzeRequest {
+  command: KitCommand
+  file: string
+  brand_map?: string | null
+}
+
+export interface KitAnalyzeResult {
+  status: string
+  command: string
+  rows: number
+  file: string
+  reports: string[]
+}
+
+export const kitApi = {
+  // /kit mount ở GỐC (không prefix /api) -> override baseURL='' để không thành /api/kit
+  analyze: (req: KitAnalyzeRequest) =>
+    api.post<KitAnalyzeResult>('/kit/analyze', req, { baseURL: '', timeout: 300000 }),
+  // URL báo cáo (mở tab mới / tải) — cũng ở gốc /kit
+  reportUrl: (name: string) => `/kit/reports/${encodeURIComponent(name)}`,
+}
+
 export interface EnvCheckResult {
   success: boolean
   message: string

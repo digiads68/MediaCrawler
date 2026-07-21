@@ -81,12 +81,19 @@ def kit_analyze(req: AnalyzeRequest) -> dict:
 
 @router.get("/reports/{name}")
 def kit_report(name: str) -> FileResponse:
-    """Tải file báo cáo Excel/JSONL do analyzer xuất ra (thư mục reports/)."""
+    """Phục vụ báo cáo do analyzer xuất (thư mục reports/).
+
+    - .html: trả inline (mở/xem ngay trong trình duyệt).
+    - .xlsx/.jsonl/.csv: trả kèm tên file để tải xuống.
+    """
     if "/" in name or "\\" in name or ".." in name:
         raise HTTPException(status_code=400, detail="Tên file không hợp lệ.")
     path = REPORTS_DIR / name
     if not path.exists():
         raise HTTPException(status_code=404, detail=f"Không thấy báo cáo: {name}")
+    if path.suffix.lower() == ".html":
+        # Không đặt filename -> Content-Disposition inline -> trình duyệt render
+        return FileResponse(path, media_type="text/html; charset=utf-8")
     return FileResponse(path, filename=name)
 
 

@@ -1,12 +1,12 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { FileJson, FileSpreadsheet, FileText, Download, Eye } from 'lucide-react'
+import { FileJson, FileSpreadsheet, FileText, Download, Eye, BarChart3 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { dataApi } from '@/lib/api'
 import { formatFileSize, formatDateTime } from '@/lib/utils'
 import { DataPreviewDialog } from './preview/DataPreviewDialog'
+import { AnalyzeDialog } from './AnalyzeDialog'
 import type { DataFile } from '@/types/crawler'
 
 interface FileCardProps {
@@ -46,6 +46,7 @@ const fileStyles: Record<string, { icon: string; border: string; badge: string }
 export function FileCard({ file }: FileCardProps) {
   const { t } = useTranslation('data')
   const [previewOpen, setPreviewOpen] = useState(false)
+  const [analyzeOpen, setAnalyzeOpen] = useState(false)
 
   const Icon = fileIcons[file.type] || FileText
   const styles = fileStyles[file.type] || {
@@ -90,9 +91,15 @@ export function FileCard({ file }: FileCardProps) {
           </div>
 
           <div className="flex items-center justify-between mt-3 pt-3 border-t border-cyber-border-subtle">
-            <Badge variant="outline" className={`text-[10px] font-mono ${styles.badge}`}>
-              .{file.type.toUpperCase()}
-            </Badge>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 px-2 font-mono text-cyber-neon-yellow hover:text-cyber-neon-yellow hover:bg-cyber-neon-yellow/10"
+              onClick={() => setAnalyzeOpen(true)}
+            >
+              <BarChart3 className="w-3 h-3 mr-1" />
+              Phân tích
+            </Button>
             <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
               {isPreviewable && (
                 <Button
@@ -127,6 +134,13 @@ export function FileCard({ file }: FileCardProps) {
           onOpenChange={setPreviewOpen}
         />
       )}
+
+      {/* Phân tích DigiAds */}
+      <AnalyzeDialog
+        file={file}
+        open={analyzeOpen}
+        onOpenChange={setAnalyzeOpen}
+      />
     </>
   )
 }
