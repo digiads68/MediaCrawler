@@ -192,6 +192,48 @@ Credential Manager (`cmdkey /delete:...` — cẩn thận target có khoảng tr
 `CredDelete` vì `cmdkey` xử lý sai cú pháp) rồi push lại để Git Credential Manager xác thực
 lại đúng tài khoản.
 
+### 5.11. `.python-version` ép cứng "đúng 3.11" → `uv run` cảnh báo trên máy chỉ có 3.12+
+
+File `.python-version` (từ repo gốc NanmiCoder) chứa `3.11` — với `uv`, một con số trần
+(không phải range) nghĩa là **pin đúng 3.11.x**, chặt hơn `pyproject.toml`'s
+`requires-python = ">=3.11"` (mở, không giới hạn trên). Máy nào chỉ cài Python 3.12/3.14
+(không có 3.11) sẽ luôn thấy `uv run` (dùng bởi `crawler_manager.py` để khởi động crawl
+thật) in cảnh báo:
+```
+warning: Using incompatible environment (`.venv`) due to `--no-sync`
+(The project environment's Python version does not satisfy the request: `Python 3.11`)
+```
+**Không chặn chức năng** (uv vẫn dùng `.venv` hiện có, crawl chạy được) nhưng gây hoang
+mang, và mâu thuẫn trực tiếp với mục tiêu portable ("máy nào cũng chạy được").
+
+**Đã xử lý:** xoá `.python-version` — để `uv`/`start.bat` tự chọn bất kỳ Python thoả
+`>=3.11` đã có trên máy (không ép đúng 1 bản). Nếu sau này cần pin lại vì lý do tương
+thích thật, **đừng dùng số trần** (`3.11`) — dùng range (`>=3.11,<3.13`) trong
+`pyproject.toml`, không tạo file `.python-version` riêng chồng lên.
+
+### 5.12. `api/webui/` (gitignored) — OneDrive/thư mục cũ có thể giữ lại bản build cũ
+
+`api/webui/` (bản build WebUI) **không nằm trong git** (`.gitignore`). `start.bat` (bản
+cũ) chỉ kiểm tra `if exist api\webui\index.html` — **có tồn tại** thì bỏ qua build, không
+kiểm tra **có khớp code mới nhất** hay không. Nếu dự án nằm trong thư mục đồng bộ
+(OneDrive/Dropbox...) và thư mục đó **đã từng tồn tại từ trước** trên máy hiện tại (ví dụ
+đồng bộ từ máy khác cùng tài khoản, hoặc clone lại vào đúng path cũ), file build cũ
+(gitignored nên không bị git ghi đè khi pull/clone) có thể vẫn còn nguyên — WebUI hiển thị
+**thiếu tính năng mới** (ví dụ nút "Phân tích") mà không báo lỗi gì, dễ nhầm là bug code.
+Cùng họ lỗi với `.venv` ở §5.9 — nguyên nhân gốc: **kiểm tra "có tồn tại" không đủ, phải
+kiểm tra "có khớp phiên bản hiện tại"**.
+
+**Đã xử lý:** `start.bat` giờ so commit git hiện tại (`git rev-parse HEAD`) với dấu vết
+lưu trong `api\webui\.build-commit` từ lần build trước — lệch (hoặc chưa có dấu vết) thì
+tự build lại; khớp thì bỏ qua (không lãng phí thời gian mỗi lần start). Đã test giả lập
+đúng tình huống OneDrive giữ bản cũ (ghi hash giả + `index.html` nội dung khác) — xác nhận
+tự phát hiện và build lại đúng.
+
+**Khuyến nghị dài hạn:** nếu vẫn gặp lại kiểu lỗi này (staleness khi đồng bộ), nên đặt
+project **ngoài** thư mục do OneDrive/Dropbox đồng bộ — các công cụ này chỉ đồng bộ đúng
+những gì *chúng* theo dõi, không biết gì về git, nên luôn có khả năng giữ lại/khôi phục
+artefact cũ (gitignored) không đồng bộ với trạng thái git thật.
+
 ### 5.10. MCP server + portability (Claude Code truy cập, copy thư mục là chạy)
 
 - **MCP server** (`kit/mcp/mcp_mediacrawler.py`) bọc REST API thành 9 tool cho AI agent

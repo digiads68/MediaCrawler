@@ -98,16 +98,36 @@ set UV_PYTHON_DOWNLOADS=never
 set UV_NO_SYNC=1
 
 REM ---------------------------------------------------------------
-REM 5. Build WebUI (neu chua build)
+REM 5. Build WebUI (neu chua build HOAC build cu khong khop commit hien tai)
+REM    QUAN TRONG: api\webui\ khong nam trong git (.gitignore). Neu thu muc
+REM    du an dat trong OneDrive/Dropbox... va cung ten thu muc da ton tai tu
+REM    truoc (vd may khac cung tai khoan da dong bo len may nay), OneDrive
+REM    co the giu lai ban build CU (khong bi git dong lai vi khong theo doi)
+REM    du code moi da git pull/clone ve - webui hien thi thieu chuc nang moi
+REM    ma khong bao loi gi. Vi vay: luon so sanh commit git hien tai voi
+REM    dau vet luu tu lan build truoc, KHONG chi kiem tra file co ton tai.
 REM ---------------------------------------------------------------
-if exist "api\webui\index.html" goto :webui_ready
-echo [4/6] Build WebUI (lan dau, can vai chuc giay)...
+set WEBUI_HASH_FILE=api\webui\.build-commit
+for /f "delims=" %%h in ('git rev-parse HEAD 2^>nul') do set GIT_HEAD=%%h
+if "%GIT_HEAD%"=="" set GIT_HEAD=nogit
+
+set NEED_WEBUI_BUILD=0
+if not exist "api\webui\index.html" set NEED_WEBUI_BUILD=1
+if not exist "%WEBUI_HASH_FILE%" set NEED_WEBUI_BUILD=1
+if exist "%WEBUI_HASH_FILE%" (
+    set /p OLD_WEBUI_HASH=<"%WEBUI_HASH_FILE%"
+    if not "!OLD_WEBUI_HASH!"=="!GIT_HEAD!" set NEED_WEBUI_BUILD=1
+)
+
+if "%NEED_WEBUI_BUILD%"=="0" goto :webui_ready
+echo [4/6] Build WebUI (chua build hoac code moi hon ban build cu, vai chuc giay)...
 where npm >nul 2>nul
 if errorlevel 1 goto :webui_no_npm
 pushd webui
 call npm install
 call npm run build
 popd
+> "%WEBUI_HASH_FILE%" echo %GIT_HEAD%
 goto :webui_done
 
 :webui_no_npm
@@ -116,7 +136,7 @@ echo            Cai Node 18+ tu https://nodejs.org roi chay lai file nay neu can
 goto :webui_done
 
 :webui_ready
-echo [4/6] WebUI - da build, bo qua.
+echo [4/6] WebUI - da build, khop code hien tai (commit !GIT_HEAD:~0,7!), bo qua.
 
 :webui_done
 
