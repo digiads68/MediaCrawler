@@ -51,6 +51,15 @@ giải ở đó (ví dụ: xung đột `starlette`/`fastapi`, `uv` không phân 
 - Không commit `.env`, secrets, dữ liệu crawl (`data/`), profile Chrome (`browser_data/`).
 - Ưu tiên tạo nhánh + PR (không code trực tiếp lên `main`) trừ khi người dùng nói khác.
 
+## Dùng qua MCP (không cần đọc code)
+
+Repo có **MCP server** (`kit/mcp/mcp_mediacrawler.py`) phơi 9 tool cho AI agent: crawl
+(search/detail/creator), `analyze` (8 case study), `list_reports`, `read_report`… Muốn
+để Claude Code (hoặc tool MCP khác) tự crawl + phân tích trend:
+1. Bật `start.bat` (API 8080).
+2. Chạy `setup_mcp.bat` (local) hoặc `start_mcp.bat` (remote qua Tailscale).
+3. Xem [`kit/mcp/README.md`](kit/mcp/README.md) để biết cách đăng ký + luồng dùng.
+
 ## Nếu bạn không phải Claude Code
 
 File `CLAUDE.md` viết cho Claude Code nhưng nội dung (ranh giới, kiến trúc, quy ước) áp

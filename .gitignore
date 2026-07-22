@@ -189,6 +189,8 @@ kit/**/reports/
 kit/pipeline/out/
 # Báo cáo analyzer xuất ra (Excel + HTML) — artefact runtime, không commit
 /reports/
+# Cấu hình MCP sinh bởi setup_mcp.bat — chứa đường dẫn tuyệt đối máy cụ thể
+/.mcp.json
 
 # Local tool/editor config (Claude Code preview, v.v.) — không phải phần source
 .claude/

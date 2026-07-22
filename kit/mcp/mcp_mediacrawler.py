@@ -11,16 +11,28 @@ Mục đích: bọc một lớp MCP mỏng lên REST API sẵn có của MediaCr
   - Giữ concurrency = 1, tôn trọng nghỉ giữa request. Không quét quy mô lớn.
   - Tuân thủ ToS nền tảng + Nghị định 13/2023 (dữ liệu cá nhân).
 
-Chạy độc lập:  uv run python mcp_mediacrawler.py
-Cần: pip install "mcp[cli]" httpx   (hoặc thêm vào uv)
+Chạy độc lập (local, stdio — cho Claude Code/Desktop cùng máy):
+    python kit/mcp/mcp_mediacrawler.py
+Chạy remote qua Tailscale (HTTP — cho máy khác kết nối vào):
+    MCP_TRANSPORT=streamable-http MCP_HOST=0.0.0.0 MCP_PORT=8765 python kit/mcp/mcp_mediacrawler.py
+Cần: pip install "mcp[cli]" httpx python-dotenv
 Yêu cầu: API MediaCrawler đang chạy  ->  uvicorn api.main:app --port 8080
+Tài liệu kết nối chi tiết: kit/mcp/README.md
 """
 
 import asyncio
 import os
+from pathlib import Path
 
 import httpx
 from mcp.server.fastmcp import FastMCP
+
+# Nạp .env ở gốc dự án (portable: suy từ __file__, copy thư mục đi đâu cũng chạy).
+try:
+    from dotenv import load_dotenv
+    load_dotenv(Path(__file__).resolve().parents[2] / ".env")
+except ImportError:
+    pass
 
 # ---- Cấu hình ----------------------------------------------------------------
 API_BASE = os.environ.get("MEDIACRAWLER_API", "http://127.0.0.1:8080")
@@ -28,7 +40,16 @@ POLL_INTERVAL_SEC = 5          # nhịp hỏi trạng thái
 POLL_TIMEOUT_SEC = 20 * 60     # trần thời gian chờ 1 lần crawl
 DEFAULT_MAX_NOTES = 50         # trần mặc định an toàn, tránh quét nặng
 
-mcp = FastMCP("mediacrawler")
+# Transport: 'stdio' (mặc định, local) | 'streamable-http' | 'sse' (remote/Tailscale)
+MCP_TRANSPORT = os.environ.get("MCP_TRANSPORT", "stdio")
+MCP_HOST = os.environ.get("MCP_HOST", "127.0.0.1")
+MCP_PORT = int(os.environ.get("MCP_PORT", "8765"))
+
+# Lệnh analyzer hợp lệ (khớp router /kit/analyze)
+ANALYZE_COMMANDS = ("trend", "insight", "koc", "opportunity",
+                    "seasonal", "price", "sov", "angle")
+
+mcp = FastMCP("mediacrawler", host=MCP_HOST, port=MCP_PORT)
 
 # Bảng mã nền tảng cho agent dễ đọc
 PLATFORMS = {
@@ -215,6 +236,106 @@ async def read_result(file_path: str, limit: int = 100) -> dict:
     return await _read_file(file_path, limit=limit)
 
 
+@mcp.tool()
+async def analyze(
+    command: str,
+    file_path: str,
+    brand_map: str | None = None,
+) -> dict:
+    """
+    Chạy 1 trong 8 phân tích DigiAds trên file dữ liệu đã cào, trả file báo cáo.
+
+    command: trend | insight | koc | opportunity | seasonal | price | sov | angle
+      - trend  : radar trend + format thắng thế + sound đang lên (CS1/CS10/CS5)
+      - insight: ngân hàng bình luận / voice-of-customer (CS2, cần file comment)
+      - koc    : chấm điểm creator + KOC đang lên (CS3/CS9)
+      - opportunity: bản đồ ngách 4 vùng cơ hội (CS4/CS6)
+      - seasonal   : sóng mùa vụ theo tuần (CS7)
+      - price  : giá & mồi khuyến mãi đối thủ (CS8)
+      - sov    : share of voice theo brand (CS11, cần brand_map)
+      - angle  : xuất angle_library.jsonl nạp pipeline AI video (CS5)
+    file_path: đường dẫn file dữ liệu, TƯƠNG ĐỐI gốc repo, ví dụ
+      "data/douyin/json/search_contents_2026-07-21.json"
+      (lấy từ list_results -> path, nhớ thêm tiền tố "data/").
+    brand_map: chỉ dùng cho sov — đường dẫn brand_map.json (mặc định
+      "kit/config/brand_map.json").
+
+    Trả về danh sách file báo cáo. Báo cáo HTML mở/đọc được tại
+    {API_BASE}/kit/reports/{tên_file} — agent có thể fetch URL đó để đọc phân
+    tích trực quan (bảng chỉ số, hook, link video để lấy ý tưởng/clone).
+    """
+    if command not in ANALYZE_COMMANDS:
+        return {"ok": False, "error": f"command phải thuộc {ANALYZE_COMMANDS}"}
+    body: dict = {"command": command, "file": file_path}
+    if command == "sov":
+        body["brand_map"] = brand_map or "kit/config/brand_map.json"
+    async with httpx.AsyncClient(timeout=300) as c:
+        try:
+            r = await c.post(f"{API_BASE}/kit/analyze", json=body)
+            r.raise_for_status()
+        except httpx.HTTPStatusError as e:
+            detail = ""
+            try:
+                detail = e.response.json().get("detail", "")
+            except Exception:  # noqa: BLE001
+                detail = e.response.text[:200]
+            return {"ok": False, "error": f"Phân tích lỗi ({e.response.status_code}): {detail}"}
+    res = r.json()
+    reports = res.get("reports", [])
+    return {
+        "ok": True,
+        "command": command,
+        "rows": res.get("rows"),
+        "reports": reports,
+        "report_urls": [f"{API_BASE}/kit/reports/{n}" for n in reports],
+        "hint": "Fetch report_urls (.html) để đọc phân tích trực quan; .xlsx để tải số liệu.",
+    }
+
+
+@mcp.tool()
+async def list_reports() -> dict:
+    """Liệt kê các file báo cáo đã sinh (Excel + HTML), kèm URL mở/tải."""
+    async with httpx.AsyncClient(timeout=15) as c:
+        r = await c.get(f"{API_BASE}/kit/reports")
+        r.raise_for_status()
+        data = r.json()
+    for item in data.get("reports", []):
+        item["full_url"] = f"{API_BASE}{item['url']}"
+    return data
+
+
+@mcp.tool()
+async def read_report(name: str) -> dict:
+    """
+    Đọc nội dung 1 báo cáo HTML (text) để agent phân tích trực tiếp trong hội thoại.
+
+    name: tên file, ví dụ "trend_report.html" (lấy từ analyze/list_reports).
+    Trả text đã cắt gọn (bỏ CSS/JS) tối đa ~40k ký tự.
+    """
+    if not name.lower().endswith(".html"):
+        return {"ok": False, "error": "Chỉ đọc được báo cáo .html. Dùng list_reports để lấy tên."}
+    async with httpx.AsyncClient(timeout=30) as c:
+        r = await c.get(f"{API_BASE}/kit/reports/{name}")
+        r.raise_for_status()
+        html = r.text
+    # Cắt gọn: bỏ <style>/<script> để agent đọc nội dung, không tốn token vào CSS/JS
+    import re
+    txt = re.sub(r"<style[\s\S]*?</style>", "", html)
+    txt = re.sub(r"<script[\s\S]*?</script>", "", txt)
+    return {"ok": True, "name": name, "html": txt[:40000],
+            "url": f"{API_BASE}/kit/reports/{name}"}
+
+
 if __name__ == "__main__":
-    # Giao tiếp qua stdio để cắm vào Claude Desktop / Paperclip.
-    mcp.run(transport="stdio")
+    # stdio: cắm trực tiếp vào Claude Code/Desktop cùng máy.
+    #   -> TUYỆT ĐỐI không ghi gì ra stdout ở mode này: stdout là kênh JSON-RPC.
+    # streamable-http / sse: chạy như service, máy khác kết nối qua Tailscale.
+    if MCP_TRANSPORT in ("streamable-http", "sse"):
+        # Windows console mặc định cp1252 -> ép UTF-8 để in tiếng Việt không lỗi
+        # (an toàn vì mode HTTP không dùng stdout làm kênh giao thức).
+        import sys
+        if hasattr(sys.stdout, "reconfigure"):
+            sys.stdout.reconfigure(encoding="utf-8")
+        print(f"[MCP] mediacrawler chay {MCP_TRANSPORT} tai {MCP_HOST}:{MCP_PORT} "
+              f"(API backend: {API_BASE})", flush=True)
+    mcp.run(transport=MCP_TRANSPORT)

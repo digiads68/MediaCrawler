@@ -37,6 +37,15 @@ from .routers import crawler_router, data_router, kit_router, websocket_router
 # Project root directory (used for running subprocesses like uv run main.py)
 PROJECT_ROOT = Path(__file__).parent.parent
 
+# Nạp .env ở gốc dự án — nhờ đó cấu hình máy (ANTHROPIC_API_KEY, NOTIFY_WEBHOOK_URL,
+# SUPABASE_*, MEDIACRAWLER_API...) đặt sẵn trong .env có tác dụng, không cần set biến
+# môi trường thủ công. Portable: đường dẫn suy từ __file__ nên copy thư mục đi đâu cũng chạy.
+try:
+    from dotenv import load_dotenv
+    load_dotenv(PROJECT_ROOT / ".env")
+except ImportError:
+    pass  # python-dotenv là dependency chuẩn; thiếu thì bỏ qua, không chặn khởi động
+
 app = FastAPI(
     title="MediaCrawler WebUI API",
     description="API for controlling MediaCrawler from WebUI",

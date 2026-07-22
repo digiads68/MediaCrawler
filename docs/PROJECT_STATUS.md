@@ -74,7 +74,7 @@ trong n8n), 5 file `kit/templates/*.xlsx`.
 | `kit/queue` (arq) | ✅ | ✅ `test_tasks.py` | CLI enqueue + worker | **Chưa chạy thật với Redis** — chỉ test bằng mock |
 | `api/routers/kit.py` | ✅ | ✅ `test_api_kit.py` | Mount trong `api/main.py` | Đã xác nhận hiện đúng trong OpenAPI `/docs` |
 | `start.bat` / `start_browser_cdp.bat` | ✅ | Chạy thật, không phải pytest | — | Đã chạy thật từ đầu-đến-cuối trên máy dev (§5.4) |
-| `kit/mcp/mcp_mediacrawler.py` | Từ zip gốc | ❌ chưa test | Chưa | **Chưa ai đụng trong các session vừa qua** — coi như chưa kiểm chứng |
+| `kit/mcp/mcp_mediacrawler.py` | ✅ (đã mở rộng) | Smoke test thủ công (import + gọi thật qua REST) | stdio (local) + streamable-http (Tailscale) | **Đã kiểm chứng + nâng cấp**: thêm tool `analyze`/`list_reports`/`read_report`, nạp `.env`, chọn transport qua env. Kèm `setup_mcp.bat` (sinh `.mcp.json` portable), `start_mcp.bat` (HTTP cho Tailscale), `kit/mcp/README.md`. Xem §5.10 |
 | `kit/n8n/*.json` (3 workflow) | Từ zip gốc | — | Chưa import n8n thật | Đã đọc hiểu nội dung khi viết docs, lịch mặc định tuần/tháng, xem §6 |
 | `kit/templates/*.xlsx` (5 mẫu) | Từ zip gốc, có công thức sống thật | — | **Chưa auto-fill** | Xem §5.5 — điền tay, không có script nối |
 | Base crawler (`media_platform/`, `api/routers/crawler.py`…) | Không sửa | Test gốc của repo | — | 6 test trong `test/` (không phải `tests/`) fail vì cần Redis/proxy thật — **có sẵn từ trước fork, không phải do kit** |
@@ -191,6 +191,29 @@ gắn với tài khoản KHÁC (không có quyền trên repo đích). Xoá 2 en
 Credential Manager (`cmdkey /delete:...` — cẩn thận target có khoảng trắng cần P/Invoke
 `CredDelete` vì `cmdkey` xử lý sai cú pháp) rồi push lại để Git Credential Manager xác thực
 lại đúng tài khoản.
+
+### 5.10. MCP server + portability (Claude Code truy cập, copy thư mục là chạy)
+
+- **MCP server** (`kit/mcp/mcp_mediacrawler.py`) bọc REST API thành 9 tool cho AI agent
+  (crawl_search/detail/creator, get_status, list_results, read_result, **analyze,
+  list_reports, read_report**). MCP chỉ điều phối — **phải bật `start.bat` (API 8080)
+  trước**.
+- **2 transport**: `stdio` (mặc định, Claude Code cùng máy) và `streamable-http`/`sse`
+  (remote qua Tailscale). Chọn bằng env `MCP_TRANSPORT`/`MCP_HOST`/`MCP_PORT`.
+- **Kết nối Claude Code**: chạy `setup_mcp.bat` → tự dò đường dẫn tuyệt đối máy hiện tại,
+  ghi `.mcp.json` (project-scoped, **gitignore** vì đường dẫn theo máy) + in lệnh
+  `claude mcp add`. Remote: `start_mcp.bat` (HTTP 0.0.0.0:8765) rồi máy khác
+  `claude mcp add --transport http mediacrawler http://<tailscale-ip>:8765/mcp`.
+  Chi tiết: `kit/mcp/README.md`.
+- **Lỗi đã gặp**: `print()` tiếng Việt ở nhánh HTTP crash cp1252 trên Windows. Đã
+  reconfigure stdout UTF-8 **chỉ trong nhánh HTTP** — TUYỆT ĐỐI không đụng stdout ở mode
+  stdio (stdout là kênh JSON-RPC của MCP, ghi vào sẽ hỏng giao thức). Batch: dấu `->` trong
+  `echo` bị hiểu là redirect `>` (tạo file rác `phai`) — bỏ `>` khỏi mọi dòng echo.
+- **Portability**: mọi đường dẫn suy từ `Path(__file__)` (không hardcode tuyệt đối), API
+  + MCP tự nạp `.env` ở gốc (`load_dotenv`) nên cấu hình máy đặt sẵn trong `.env` có tác
+  dụng. Copy cả thư mục (kèm `api/webui/` đã build) sang máy khác → `start.bat` tự tạo lại
+  `.venv` nếu hỏng (§5.9) → chạy được ở đường dẫn bất kỳ. Bước setup 1 lần cho MCP:
+  `setup_mcp.bat`.
 
 ### 5.9. `.venv` đồng bộ qua OneDrive từ máy khác → hỏng (đường dẫn Python máy cũ)
 

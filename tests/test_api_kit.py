@@ -80,10 +80,32 @@ def test_sov_thieu_brand_map(client, project_files):
     assert "brand_map" in resp.json()["detail"]
 
 
+def test_reports_liet_ke(client, project_files):
+    (project_files / "reports" / "trend_report.html").write_text("<h1>x</h1>",
+                                                                 encoding="utf-8")
+    resp = client.get("/kit/reports")
+    assert resp.status_code == 200
+    names = {r["name"] for r in resp.json()["reports"]}
+    assert "CS1_trend_top_posts.xlsx" in names
+    assert "trend_report.html" in names
+
+
+def test_report_html_tra_inline(client, project_files):
+    (project_files / "reports" / "trend_report.html").write_text("<h1>x</h1>",
+                                                                 encoding="utf-8")
+    resp = client.get("/kit/reports/trend_report.html")
+    assert resp.status_code == 200
+    # HTML phải inline (render), KHÔNG phải attachment (tải)
+    assert "attachment" not in resp.headers.get("content-disposition", "")
+    assert "text/html" in resp.headers.get("content-type", "")
+
+
 def test_report_tai_file(client, project_files):
     resp = client.get("/kit/reports/CS1_trend_top_posts.xlsx")
     assert resp.status_code == 200
     assert resp.content.startswith(b"PK")
+    # xlsx phải là attachment (tải về)
+    assert "attachment" in resp.headers.get("content-disposition", "")
 
 
 def test_report_khong_co(client, project_files):

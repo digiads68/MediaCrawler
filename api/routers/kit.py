@@ -79,6 +79,22 @@ def kit_analyze(req: AnalyzeRequest) -> dict:
     return {"status": "ok", **result}
 
 
+@router.get("/reports")
+def kit_reports_list() -> dict:
+    """Liệt kê các file báo cáo trong thư mục reports/ (Excel + HTML), mới nhất trước."""
+    if not REPORTS_DIR.exists():
+        return {"reports": []}
+    items = []
+    for p in REPORTS_DIR.iterdir():
+        if p.is_file() and p.suffix.lower() in (".html", ".xlsx", ".jsonl", ".csv"):
+            st = p.stat()
+            items.append({"name": p.name, "type": p.suffix[1:].lower(),
+                          "size": st.st_size, "modified_at": st.st_mtime,
+                          "url": f"/kit/reports/{p.name}"})
+    items.sort(key=lambda x: x["modified_at"], reverse=True)
+    return {"reports": items}
+
+
 @router.get("/reports/{name}")
 def kit_report(name: str) -> FileResponse:
     """Phục vụ báo cáo do analyzer xuất (thư mục reports/).
