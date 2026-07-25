@@ -37,6 +37,18 @@ class AnalyzeRequest(BaseModel):
                                      description="Đường dẫn brand_map.json (cho sov)")
 
 
+class DashboardRequest(BaseModel):
+    """Yêu cầu sinh dashboard đa nền tảng từ nhiều file raw."""
+
+    files: list[str] = Field(..., min_length=1,
+                             description="Danh sách file raw (xlsx/jsonl/csv), "
+                                         "tương đối so với gốc repo")
+    out: str = Field(default="reports/dashboard.html",
+                     description="Đường dẫn HTML đầu ra (trong repo)")
+    n8n_webhook: str | None = Field(default=None,
+                                    description="URL webhook n8n nhúng vào trang")
+
+
 class AngleBriefRequest(BaseModel):
     """Yêu cầu chạy pipeline angle_library.jsonl -> Video Brief."""
 
@@ -77,6 +89,28 @@ def kit_analyze(req: AnalyzeRequest) -> dict:
         raise HTTPException(status_code=422,
                             detail=f"Phân tích lỗi: {exc}") from exc
     return {"status": "ok", **result}
+
+
+@router.post("/dashboard")
+def kit_dashboard(req: DashboardRequest) -> dict:
+    """Gộp nhiều file raw đa nền tảng thành 1 dashboard HTML tương tác."""
+    from kit.dashboard import build_dashboard
+
+    files = [str(_resolve_in_project(f)) for f in req.files]
+    # Ép file output nằm trong repo (chặn path traversal).
+    out = (PROJECT_ROOT / req.out).resolve()
+    if not str(out).startswith(str(PROJECT_ROOT)):
+        raise HTTPException(status_code=400,
+                            detail="Đường dẫn output nằm ngoài thư mục dự án.")
+    try:
+        path = build_dashboard(files, out=out, n8n_webhook=req.n8n_webhook)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=422,
+                            detail=f"Sinh dashboard lỗi: {exc}") from exc
+    return {"status": "ok", "report": path.name,
+            "url": f"/kit/reports/{path.name}"}
 
 
 @router.get("/reports")

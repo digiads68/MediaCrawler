@@ -1,0 +1,148 @@
+{
+  "name": "WF-MC4 · Content Action (Dashboard → tải · voice→text · phân tích ND/Hook)",
+  "meta": {
+    "description": "Webhook nhận action từ dashboard DigiAds (kit/dashboard). Định tuyến theo action: download / transcribe / analyze / hook. Payload gồm {platform, item_id, title, content_url, download_url, cover_url, source_keyword, nickname}. Trường hợp gửi loạt: payload.batch=true và payload.items=[...]. Nhớ đổi credential Anthropic + endpoint speech-to-text theo hệ thống của bạn."
+  },
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "mc-action",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "name": "Webhook · /mc-action",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 300],
+      "webhookId": "digiads-mc-action"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            { "conditions": { "options": { "caseSensitive": true, "typeValidation": "strict" }, "conditions": [ { "leftValue": "={{ $json.body.action }}", "rightValue": "download", "operator": { "type": "string", "operation": "equals" } } ], "combinator": "and" }, "outputKey": "download" },
+            { "conditions": { "options": { "caseSensitive": true, "typeValidation": "strict" }, "conditions": [ { "leftValue": "={{ $json.body.action }}", "rightValue": "transcribe", "operator": { "type": "string", "operation": "equals" } } ], "combinator": "and" }, "outputKey": "transcribe" },
+            { "conditions": { "options": { "caseSensitive": true, "typeValidation": "strict" }, "conditions": [ { "leftValue": "={{ $json.body.action }}", "rightValue": "analyze", "operator": { "type": "string", "operation": "equals" } } ], "combinator": "and" }, "outputKey": "analyze" },
+            { "conditions": { "options": { "caseSensitive": true, "typeValidation": "strict" }, "conditions": [ { "leftValue": "={{ $json.body.action }}", "rightValue": "hook", "operator": { "type": "string", "operation": "equals" } } ], "combinator": "and" }, "outputKey": "hook" }
+          ]
+        },
+        "options": { "fallbackOutput": "extra" }
+      },
+      "name": "Định tuyến theo action",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.body.payload.download_url }}",
+        "options": { "response": { "response": { "responseFormat": "file" } } }
+      },
+      "name": "Tải video/ảnh gốc",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [520, 60]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.body.payload.download_url }}",
+        "options": { "response": { "response": { "responseFormat": "file" } } }
+      },
+      "name": "Tải file để bóc lời",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [520, 240]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/audio/transcriptions",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [ { "name": "Authorization", "value": "Bearer <OPENAI_OR_LOCAL_STT_KEY>" } ] },
+        "contentType": "multipart-form-data",
+        "sendBody": true,
+        "bodyParameters": { "parameters": [ { "name": "model", "value": "whisper-1" }, { "parameterType": "formBinaryData", "name": "file", "inputDataFieldName": "data" } ] },
+        "options": {}
+      },
+      "name": "Speech-to-Text (Whisper/thay được)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [760, 240]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [ { "name": "x-api-key", "value": "={{ $env.ANTHROPIC_API_KEY }}" }, { "name": "anthropic-version", "value": "2023-06-01" }, { "name": "content-type", "value": "application/json" } ] },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"claude-sonnet-4-6\",\n  \"max_tokens\": 1024,\n  \"messages\": [\n    {\"role\": \"user\", \"content\": \"Bạn là chuyên gia phân tích nội dung social. Phân tích bài dưới đây và TRẢ JSON THUẦN: {\\\"tom_tat\\\": ..., \\\"chu_de\\\": [...], \\\"goc_nhin\\\": ..., \\\"cong_thuc_noi_dung\\\": ..., \\\"y_tuong_ban_dia_hoa_vi\\\": [...]}.\\n\\nTiêu đề: \" + $json.body.payload.title + \"\\nNền tảng: \" + $json.body.payload.platform + \"\\nTừ khoá: \" + $json.body.payload.source_keyword + \"\\nURL: \" + $json.body.payload.content_url }\n  ]\n}",
+        "options": {}
+      },
+      "name": "Phân tích nội dung (Claude)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [520, 420]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [ { "name": "x-api-key", "value": "={{ $env.ANTHROPIC_API_KEY }}" }, { "name": "anthropic-version", "value": "2023-06-01" }, { "name": "content-type", "value": "application/json" } ] },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"claude-sonnet-4-6\",\n  \"max_tokens\": 800,\n  \"messages\": [\n    {\"role\": \"user\", \"content\": \"Bạn là chuyên gia viết hook video ngắn. Mổ xẻ hook (3 giây đầu) của tiêu đề sau và TRẢ JSON THUẦN: {\\\"loai_hook\\\": ..., \\\"cong_thuc\\\": ..., \\\"noi_dau_hoac_mong_muon\\\": ..., \\\"3_bien_the_hook_tieng_viet\\\": [...]}.\\n\\nTiêu đề gốc: \" + $json.body.payload.title }\n  ]\n}",
+        "options": {}
+      },
+      "name": "Phân tích Hook (Claude)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [520, 600]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"ok\": true, \"action\": $('Webhook · /mc-action').item.json.body.action, \"item_id\": $('Webhook · /mc-action').item.json.body.payload.item_id, \"result\": $json } }}",
+        "options": {}
+      },
+      "name": "Trả kết quả về dashboard",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1020, 300]
+    },
+    {
+      "parameters": {
+        "content": "## WF-MC4 · Content Action\n\nNhận action từ **kit/dashboard** (nút 📥 Tải · 🎙️ Voice→Text · 🧠 Phân tích ND · 🪝 Phân tích Hook).\n\n**Cần chỉnh trước khi chạy:**\n1. Credential Anthropic (biến `ANTHROPIC_API_KEY`) cho 2 node Claude.\n2. Endpoint + key Speech-to-Text (đang để Whisper mẫu — thay bằng dịch vụ của bạn hoặc node cục bộ).\n3. Node 'Tải' hiện chỉ tải file vào workflow — nối thêm node ghi ra ổ đĩa / S3 / Supabase Storage tuỳ kho của bạn.\n4. Gửi loạt: `payload.batch=true`, `payload.items[]` — thêm node *Split Out* trên field `body.payload.items` trước Switch nếu muốn xử lý từng video.\n5. CORS: bật 'Allowed Origins' cho webhook để dashboard (mở từ file://) POST được, hoặc chạy dashboard qua http.",
+        "height": 320,
+        "width": 420
+      },
+      "name": "Hướng dẫn",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [0, -60]
+    }
+  ],
+  "connections": {
+    "Webhook · /mc-action": { "main": [ [ { "node": "Định tuyến theo action", "type": "main", "index": 0 } ] ] },
+    "Định tuyến theo action": {
+      "main": [
+        [ { "node": "Tải video/ảnh gốc", "type": "main", "index": 0 } ],
+        [ { "node": "Tải file để bóc lời", "type": "main", "index": 0 } ],
+        [ { "node": "Phân tích nội dung (Claude)", "type": "main", "index": 0 } ],
+        [ { "node": "Phân tích Hook (Claude)", "type": "main", "index": 0 } ]
+      ]
+    },
+    "Tải file để bóc lời": { "main": [ [ { "node": "Speech-to-Text (Whisper/thay được)", "type": "main", "index": 0 } ] ] },
+    "Tải video/ảnh gốc": { "main": [ [ { "node": "Trả kết quả về dashboard", "type": "main", "index": 0 } ] ] },
+    "Speech-to-Text (Whisper/thay được)": { "main": [ [ { "node": "Trả kết quả về dashboard", "type": "main", "index": 0 } ] ] },
+    "Phân tích nội dung (Claude)": { "main": [ [ { "node": "Trả kết quả về dashboard", "type": "main", "index": 0 } ] ] },
+    "Phân tích Hook (Claude)": { "main": [ [ { "node": "Trả kết quả về dashboard", "type": "main", "index": 0 } ] ] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "tags": [ { "name": "DigiAds" }, { "name": "MediaCrawler" } ]
+}

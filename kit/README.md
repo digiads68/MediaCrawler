@@ -13,6 +13,8 @@ kit/
 ├── HANDBOOK_11_case_studies.html   # Sổ tay: mở file này trước
 ├── analyzer/
 │   └── mediacrawler_analyzer.py    # 1 file phân tích cho cả 11 case
+├── dashboard/                      # Dashboard HTML đa nền tảng + nút nối n8n
+│   └── (adapters · metrics · render · build)
 ├── prompts/
 │   └── angle_to_video_prompts.py   # Nối Angle Library → pipeline AI video
 ├── mcp/
@@ -20,7 +22,8 @@ kit/
 ├── n8n/
 │   ├── WF_MC1_trend_brief_weekly.json     # CS1+CS10+CS5 tự động (tuần)
 │   ├── WF_MC2_sov_monitor_monthly.json    # CS11 tự động (tháng)
-│   └── WF_MC3_rising_koc_alert.json        # CS9 tự động (2 tuần)
+│   ├── WF_MC3_rising_koc_alert.json        # CS9 tự động (2 tuần)
+│   └── WF_MC4_content_action.json          # Webhook nút hành động dashboard
 ├── config/
 │   └── brand_map.json              # rổ brand cho CS11 (sửa tại đây)
 └── templates/
@@ -63,6 +66,37 @@ python3 analyzer/mediacrawler_analyzer.py koc    data/douyin/creator_x.xlsx
 python3 analyzer/mediacrawler_analyzer.py sov    data/douyin/search_x.xlsx config/brand_map.json
 ```
 
+## Dashboard đa nền tảng (nghiên cứu trend + đối thủ)
+
+Gộp **nhiều file raw** (Douyin/Bilibili/XHS, trộn search & creator) thành **một
+trang HTML tương tác, tự chứa** — mở offline, không cần server. Gồm 5 tab:
+
+- **Tổng quan** — KPI, cơ cấu nền tảng/từ khoá/format, nhịp đăng theo tuần.
+- **Trend & Video** — lưới thẻ video (cover preview + modal xem nhanh), lọc/sắp/tìm,
+  chọn nhiều, và **nút nối n8n** trên từng thẻ: 📥 Tải · 🎙️ Voice→Text · 🧠 Phân tích ND · 🪝 Phân tích Hook.
+- **Đối thủ** — scorecard creator: số video, tương tác TB, độ đều, velocity WoW.
+- **Hook Lab** — top hashtag + công thức hook phổ biến + ví dụ tiêu biểu.
+- **Cơ hội** — bản đồ ngách (volume × tương tác), gợi ý "ngách vàng".
+
+```bash
+# CLI: liệt kê nhiều file, ra 1 dashboard
+python3 -m kit.dashboard data/douyin/search_x.xlsx data/bilibili/search_x.xlsx \
+    data/xhs/search_x.xlsx -o reports/dashboard.html \
+    --n8n https://n8n.cua-ban.vn/webhook/mc-action
+```
+
+```python
+from kit.dashboard import build_dashboard
+build_dashboard(["data/douyin/search_x.xlsx", "data/xhs/search_x.xlsx"])
+```
+
+REST: `POST /kit/dashboard` với `{"files": ["data/.../a.xlsx", ...], "out": "reports/dashboard.html"}`.
+
+**Nối n8n:** bấm *⚙ Kết nối n8n* trên dashboard, dán URL webhook (lưu ở trình duyệt),
+rồi import workflow **`n8n/WF_MC4_content_action.json`** — nó định tuyến theo `action`
+(tải / bóc lời / phân tích ND / phân tích hook). Nhớ đặt credential Anthropic + endpoint
+speech-to-text trong n8n, và bật CORS cho webhook nếu mở dashboard từ `file://`.
+
 ## Nối vào pipeline AI video (CS5)
 
 ```python
@@ -73,7 +107,8 @@ from prompts.angle_to_video_prompts import build_script_prompt, VIDEO_BRIEF_SCHE
 
 ## Tự động hoá (n8n)
 
-Import 3 file trong `n8n/`. Biến môi trường cần đặt trong n8n:
+Import 4 file trong `n8n/` (WF_MC1..MC3 tự động theo lịch; **WF_MC4** là webhook cho
+nút hành động trên dashboard). Biến môi trường cần đặt trong n8n:
 `ANTHROPIC_API_KEY`, `NOTIFY_WEBHOOK_URL`, `SUPABASE_URL`, `SUPABASE_KEY`.
 Sửa đường dẫn `executeCommand` cho khớp máy chủ (mặc định `/opt/digiads/kit` và
 `/opt/MediaCrawler/data`).
@@ -83,13 +118,14 @@ Sửa đường dẫn `executeCommand` cho khớp máy chủ (mặc định `/op
 | Module | Dùng khi | Lệnh/API |
 |---|---|---|
 | `enrich/` | Chuẩn hoá dữ liệu thô, velocity WoW, dịch ZH→VI | `from kit.enrich import normalize, weekly_velocity, translate_zh_vi` |
+| `dashboard/` | Dashboard HTML đa nền tảng + nút nối n8n | `python -m kit.dashboard <file...> -o reports/dashboard.html` |
 | `storage/schema/` | Tạo kho Supabase (1 lần) | chạy `001` → `002` → `003` (xem `storage/README.md`) |
 | `storage/supabase_writer.py` | Ghi kết quả analyzer lên Supabase | thêm cờ `--to supabase` (thử trước: `--dry-run`) |
 | `storage/checkpoint.py` | Crawl tăng dần — lần 2 chỉ xử lý post mới | option `incremental` trong job queue |
 | `pipeline/angle_to_brief.py` | Angle → Video Brief JSON cho AI video | `python kit/pipeline/angle_to_brief.py <angle.jsonl> --product "..." [--provider mock]` |
 | `webhook/emit.py` | Bắn event sang n8n sau khi phân tích | thêm cờ `--notify` |
 | `queue/` | Chạy nhiều ngách theo hàng đợi (cần Redis) | `arq kit.queue.worker.WorkerSettings` + `python kit/queue/enqueue.py dy search "kw" --analyze trend` |
-| REST `/kit/*` | Gọi kit qua HTTP | `POST /kit/analyze`, `GET /kit/reports/{name}`, `POST /kit/angle-brief` |
+| REST `/kit/*` | Gọi kit qua HTTP | `POST /kit/analyze`, `POST /kit/dashboard`, `GET /kit/reports/{name}`, `POST /kit/angle-brief` |
 
 Ví dụ chuỗi đầy đủ Tier 1:
 
