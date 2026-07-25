@@ -37,14 +37,26 @@ class AnalyzeRequest(BaseModel):
                                      description="Đường dẫn brand_map.json (cho sov)")
 
 
+DashboardProfile = Literal["auto", "all", "search", "creator", "video",
+                           "overview"]
+
+
 class DashboardRequest(BaseModel):
-    """Yêu cầu sinh dashboard đa nền tảng từ nhiều file raw."""
+    """Yêu cầu sinh dashboard chuyên sâu từ nhiều file raw."""
 
     files: list[str] = Field(..., min_length=1,
                              description="Danh sách file raw (xlsx/jsonl/csv), "
                                          "tương đối so với gốc repo")
-    out: str = Field(default="reports/dashboard.html",
-                     description="Đường dẫn HTML đầu ra (trong repo)")
+    profile: DashboardProfile = Field(
+        default="auto",
+        description="Loại dashboard: auto (theo mode cào) | all (sinh tất cả + "
+                    "index) | search | creator | video | overview")
+    out: str | None = Field(
+        default=None,
+        description="Đường dẫn HTML ra (1 loại). Bỏ trống -> "
+                    "reports/dashboard_<loại>.html")
+    out_dir: str = Field(default="reports",
+                         description="Thư mục ra khi profile='all'")
     n8n_webhook: str | None = Field(default=None,
                                     description="URL webhook n8n nhúng vào trang")
 
@@ -91,19 +103,39 @@ def kit_analyze(req: AnalyzeRequest) -> dict:
     return {"status": "ok", **result}
 
 
-@router.post("/dashboard")
-def kit_dashboard(req: DashboardRequest) -> dict:
-    """Gộp nhiều file raw đa nền tảng thành 1 dashboard HTML tương tác."""
-    from kit.dashboard import build_dashboard
-
-    files = [str(_resolve_in_project(f)) for f in req.files]
-    # Ép file output nằm trong repo (chặn path traversal).
-    out = (PROJECT_ROOT / req.out).resolve()
-    if not str(out).startswith(str(PROJECT_ROOT)):
+def _safe_out(rel_path: str) -> Path:
+    """Ép đường dẫn ghi nằm TRONG gốc repo (chặn path traversal)."""
+    p = (PROJECT_ROOT / rel_path).resolve()
+    if not str(p).startswith(str(PROJECT_ROOT)):
         raise HTTPException(status_code=400,
                             detail="Đường dẫn output nằm ngoài thư mục dự án.")
+    return p
+
+
+@router.post("/dashboard")
+def kit_dashboard(req: DashboardRequest) -> dict:
+    """
+    Sinh dashboard chuyên sâu theo mode cào.
+
+    `profile="all"` sinh mọi loại phù hợp kèm trang index để điều hướng.
+    """
+    from kit.dashboard import build_all, build_dashboard
+
+    files = [str(_resolve_in_project(f)) for f in req.files]
     try:
-        path = build_dashboard(files, out=out, n8n_webhook=req.n8n_webhook)
+        if req.profile == "all":
+            made = build_all(files, out_dir=_safe_out(req.out_dir),
+                             n8n_webhook=req.n8n_webhook)
+            return {"status": "ok",
+                    "reports": {k: {"report": p.name,
+                                    "url": f"/kit/reports/{p.name}"}
+                                for k, p in made.items()},
+                    "index_url": f"/kit/reports/{made['index'].name}"}
+        out = _safe_out(req.out) if req.out else None
+        path = build_dashboard(files, profile=req.profile, out=out,
+                               n8n_webhook=req.n8n_webhook)
+    except HTTPException:
+        raise
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:  # noqa: BLE001

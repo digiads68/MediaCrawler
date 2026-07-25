@@ -13,8 +13,12 @@ kit/
 ├── HANDBOOK_11_case_studies.html   # Sổ tay: mở file này trước
 ├── analyzer/
 │   └── mediacrawler_analyzer.py    # 1 file phân tích cho cả 11 case
-├── dashboard/                      # Dashboard HTML đa nền tảng + nút nối n8n
-│   └── (adapters · metrics · render · build)
+├── dashboard/                      # 4 loại dashboard HTML chuyên sâu + nút n8n
+│   ├── adapters.py                 #   schema riêng từng nền tảng -> hợp nhất
+│   ├── metrics.py                  #   nạp/gộp/chuẩn hoá + chỉ số chung
+│   ├── analysis.py                 #   phân tích sâu (benchmark, outlier, VoC...)
+│   ├── theme.py components.py      #   khung trang + khối UI dùng chung
+│   └── profiles/                   #   search · creator · video · overview
 ├── prompts/
 │   └── angle_to_video_prompts.py   # Nối Angle Library → pipeline AI video
 ├── mcp/
@@ -59,6 +63,9 @@ pip install pandas openpyxl httpx "mcp[cli]"
 | CS9 Rising KOC | `--type search` | `koc` | CS9_rising_creators |
 | CS11 SOV | `--type search` (lặp rổ) | `sov brand_map.json` | SOV_DASHBOARD |
 
+> Muốn xem trực quan + bấm hành động (tải/voice→text/phân tích) thay vì file Excel
+> → dùng **dashboard chuyên sâu** ở mục dưới.
+
 Ví dụ:
 ```bash
 python3 analyzer/mediacrawler_analyzer.py trend  data/douyin/search_护肤.xlsx
@@ -66,36 +73,73 @@ python3 analyzer/mediacrawler_analyzer.py koc    data/douyin/creator_x.xlsx
 python3 analyzer/mediacrawler_analyzer.py sov    data/douyin/search_x.xlsx config/brand_map.json
 ```
 
-## Dashboard đa nền tảng (nghiên cứu trend + đối thủ)
+## Dashboard chuyên sâu (4 loại, theo mode cào)
 
-Gộp **nhiều file raw** (Douyin/Bilibili/XHS, trộn search & creator) thành **một
-trang HTML tương tác, tự chứa** — mở offline, không cần server. Gồm 5 tab:
+MediaCrawler có 3 mode cào, mỗi mode cho dữ liệu có "hình" khác nhau — nên có
+**4 loại dashboard chuyên sâu** thay vì một bản tổng quan chung. Tất cả là HTML
+**tự chứa**, mở offline, không cần server.
 
-- **Tổng quan** — KPI, cơ cấu nền tảng/từ khoá/format, nhịp đăng theo tuần.
-- **Trend & Video** — lưới thẻ video (cover preview + modal xem nhanh), lọc/sắp/tìm,
-  chọn nhiều, và **nút nối n8n** trên từng thẻ: 📥 Tải · 🎙️ Voice→Text · 🧠 Phân tích ND · 🪝 Phân tích Hook.
-- **Đối thủ** — scorecard creator: số video, tương tác TB, độ đều, velocity WoW.
-- **Hook Lab** — top hashtag + công thức hook phổ biến + ví dụ tiêu biểu.
-- **Cơ hội** — bản đồ ngách (volume × tương tác), gợi ý "ngách vàng".
+| Loại | Mode cào | Chuyên sâu về |
+|---|---|---|
+| **`search`** · Trend Radar | `--type search` | Săn trend & lên ý tưởng content |
+| **`creator`** · Channel Audit | `--type creator` | Soi kênh đối thủ |
+| **`video`** · Video Teardown | `--type detail` (+`--get_comment`) | Mổ xẻ video & tiếng nói khán giả |
+| **`overview`** | trộn nhiều mode | Bức tranh chéo nền tảng để họp |
+
+**`search` — Trend Radar** (5 tab)
+- *Ngách & Chuẩn*: benchmark P25→P90 (biết bao nhiêu mới là "bài tốt") + mốc riêng từng nền tảng.
+- *Video đáng clone*: sắp theo **mức vượt trội so với trung vị nền tảng**, nhãn 🚀 Bứt phá.
+- *Format × Từ khoá*: ma trận hiệu quả + **khe trống** (cầu cao, cung thấp).
+- *Hook Lab*: công thức hook nào **thực sự** hiệu quả (eng trung vị + tỷ lệ thắng), không chỉ đếm.
+- *Thời điểm & Cơ hội*: heatmap giờ×thứ + bản đồ ngách vàng.
+
+**`creator` — Channel Audit** (4 tab)
+- *So sánh kênh*: nhịp đăng, đà tăng (velocity), độ đều, số bài bứt phá.
+- *Soi từng kênh* (có bộ chọn kênh): timeline từng bài, **bài bứt phá so với chính kênh**
+  → công thức trúng; format & hook kênh thắng bằng gì; bài tốt nhất vs kém nhất.
+- *Thư viện bài* (lọc theo kênh) · *Nhịp đăng* (giờ đối thủ hay đăng).
+
+**`video` — Video Teardown** (4 tab)
+- *Mổ xẻ video*: giải phẫu Like/Save/Share/Comment theo **tỷ lệ so với P50** trên thang chung.
+- *Voice of Customer*: từ khoá khán giả nhắc nhiều, bình luận top (gộp câu lặp, hiện `lặp N×`).
+- *Ý tưởng từ bình luận*: câu hỏi khán giả → chủ đề có cầu sẵn; tín hiệu nỗi đau/mong muốn → angle.
+- *Thư viện*.
+
+Mọi lưới video đều có preview + modal xem nhanh + **nút nối n8n**
+(📥 Tải · 🎙️ Voice→Text · 🧠 Phân tích ND · 🪝 Phân tích Hook), chọn nhiều để gửi loạt.
 
 ```bash
-# CLI: liệt kê nhiều file, ra 1 dashboard
-python3 -m kit.dashboard data/douyin/search_x.xlsx data/bilibili/search_x.xlsx \
-    data/xhs/search_x.xlsx -o reports/dashboard.html \
+# Chuyên theo mode
+python3 -m kit.dashboard search  data/douyin/search_x.xlsx data/xhs/search_x.xlsx
+python3 -m kit.dashboard creator data/douyin/creator_x.xlsx
+python3 -m kit.dashboard video   data/douyin/detail_x.xlsx      # cần sheet Comments
+
+# Không chỉ định loại -> tự chọn theo mode cào trong dữ liệu
+python3 -m kit.dashboard data/douyin/search_x.xlsx
+
+# Sinh TẤT CẢ loại phù hợp + trang điều hướng dashboard_index.html
+python3 -m kit.dashboard all data/douyin/*.xlsx data/xhs/*.xlsx \
     --n8n https://n8n.cua-ban.vn/webhook/mc-action
 ```
 
 ```python
-from kit.dashboard import build_dashboard
-build_dashboard(["data/douyin/search_x.xlsx", "data/xhs/search_x.xlsx"])
+from kit.dashboard import build_all, build_dashboard
+build_dashboard(["data/douyin/search_x.xlsx"], profile="search")
+build_all(["data/douyin/search_x.xlsx", "data/douyin/creator_x.xlsx"])
 ```
 
-REST: `POST /kit/dashboard` với `{"files": ["data/.../a.xlsx", ...], "out": "reports/dashboard.html"}`.
+REST: `POST /kit/dashboard` với `{"files": [...], "profile": "search"}`
+(`profile`: `auto` | `all` | `search` | `creator` | `video` | `overview`).
 
 **Nối n8n:** bấm *⚙ Kết nối n8n* trên dashboard, dán URL webhook (lưu ở trình duyệt),
 rồi import workflow **`n8n/WF_MC4_content_action.json`** — nó định tuyến theo `action`
 (tải / bóc lời / phân tích ND / phân tích hook). Nhớ đặt credential Anthropic + endpoint
 speech-to-text trong n8n, và bật CORS cho webhook nếu mở dashboard từ `file://`.
+
+**Lưu ý số liệu:** bài trùng (cùng video cào ở nhiều từ khoá) được gộp theo
+`(nền tảng, item_id)`; điểm trend và mức vượt trội chuẩn hoá **trong từng nền tảng**
+vì thang tương tác giữa các nền tảng lệch rất xa; độ đều dùng thang tứ phân vị nên
+một bài viral lẻ không làm sai lệch.
 
 ## Nối vào pipeline AI video (CS5)
 
@@ -118,7 +162,7 @@ Sửa đường dẫn `executeCommand` cho khớp máy chủ (mặc định `/op
 | Module | Dùng khi | Lệnh/API |
 |---|---|---|
 | `enrich/` | Chuẩn hoá dữ liệu thô, velocity WoW, dịch ZH→VI | `from kit.enrich import normalize, weekly_velocity, translate_zh_vi` |
-| `dashboard/` | Dashboard HTML đa nền tảng + nút nối n8n | `python -m kit.dashboard <file...> -o reports/dashboard.html` |
+| `dashboard/` | 4 loại dashboard chuyên sâu theo mode cào | `python -m kit.dashboard [search\|creator\|video\|overview\|all] <file...>` |
 | `storage/schema/` | Tạo kho Supabase (1 lần) | chạy `001` → `002` → `003` (xem `storage/README.md`) |
 | `storage/supabase_writer.py` | Ghi kết quả analyzer lên Supabase | thêm cờ `--to supabase` (thử trước: `--dry-run`) |
 | `storage/checkpoint.py` | Crawl tăng dần — lần 2 chỉ xử lý post mới | option `incremental` trong job queue |

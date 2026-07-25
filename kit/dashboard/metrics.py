@@ -18,7 +18,13 @@ from typing import Any
 
 import pandas as pd
 
-from kit.dashboard.adapters import PLATFORM_LABELS, adapt
+from kit.dashboard.adapters import (
+    COMMENT_COLS,
+    PLATFORM_LABELS,
+    adapt,
+    adapt_comments,
+    detect_platform,
+)
 from kit.enrich.normalize import normalize
 from kit.enrich.velocity import weekly_velocity
 
@@ -42,24 +48,79 @@ HOOK_PATTERNS: dict[str, list[str]] = {
 }
 
 
-def load_unified(paths: list[str | Path]) -> pd.DataFrame:
-    """Nạp + hợp nhất + chuẩn hoá nhiều file raw thành 1 DataFrame."""
+def load_bundle(paths: list[str | Path]) -> dict[str, Any]:
+    """
+    Nạp nhiều file raw → {"content": df, "comments": df, "modes": Counter}.
+
+    Đọc cả 2 sheet MediaCrawler xuất ra: `Contents` (bài) và `Comments` (bình
+    luận, chỉ có khi crawl bật `--get_comment`). `modes` đếm số file theo mode
+    cào (search / creator / detail) để build.py tự chọn loại dashboard.
+    """
     frames: list[pd.DataFrame] = []
+    cframes: list[pd.DataFrame] = []
+    modes: Counter[str] = Counter()
+
     for p in paths:
         p = Path(p)
         if p.suffix == ".xlsx":
-            raw = pd.read_excel(p)
+            xl = pd.ExcelFile(p)
+            sheets = xl.sheet_names
+            main = "Contents" if "Contents" in sheets else sheets[0]
+            raw = pd.read_excel(p, sheet_name=main)
+            if "Comments" in sheets:
+                craw = pd.read_excel(p, sheet_name="Comments")
+                if not craw.empty:
+                    cframes.append(adapt_comments(
+                        craw, platform=detect_platform(raw)))
         elif p.suffix in (".jsonl", ".json"):
             raw = pd.read_json(p, lines=(p.suffix == ".jsonl"))
         elif p.suffix == ".csv":
             raw = pd.read_csv(p)
         else:
             raise ValueError(f"Định dạng chưa hỗ trợ: {p.suffix}")
-        frames.append(adapt(raw, source=str(p)))
+        adapted = adapt(raw, source=str(p))
+        frames.append(adapted)
+        if len(adapted):
+            modes[str(adapted["content_kind"].iloc[0])] += 1
+
     if not frames:
         raise ValueError("Không có file nào để nạp.")
-    df = pd.concat(frames, ignore_index=True)
-    df = normalize(df)
+    content = _finalize(pd.concat(frames, ignore_index=True))
+    comments = (pd.concat(cframes, ignore_index=True) if cframes
+                else pd.DataFrame(columns=COMMENT_COLS))
+    if not comments.empty:
+        comments = comments.drop_duplicates("comment_id")
+    return {"content": content, "comments": comments, "modes": modes}
+
+
+def load_unified(paths: list[str | Path]) -> pd.DataFrame:
+    """Nạp + hợp nhất + chuẩn hoá nhiều file raw thành 1 DataFrame bài viết."""
+    return load_bundle(paths)["content"]
+
+
+#: Cột đếm của schema hợp nhất — phải là số, thiếu thì coi như 0.
+_NUMERIC_COLS = ("liked_count", "collected_count", "comment_count",
+                 "share_count", "play_count", "coin_count", "danmaku_count")
+
+
+def sanitize_counts(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Ép các cột đếm về số và điền 0 cho ô trống.
+
+    Cần thiết vì một số nền tảng (vd. XHS) để trống comment_count ở vài bài —
+    nếu không xử lý, eng_total sẽ thành NaN và làm hỏng mọi thống kê/biểu đồ
+    phía sau.
+    """
+    d = df.copy()
+    for c in _NUMERIC_COLS:
+        if c in d.columns:
+            d[c] = pd.to_numeric(d[c], errors="coerce").fillna(0.0)
+    return d
+
+
+def _finalize(df: pd.DataFrame) -> pd.DataFrame:
+    """Làm sạch số → chuẩn hoá → gộp trùng → chấm điểm trend."""
+    df = normalize(sanitize_counts(df))
     df = dedupe(df)
     return add_trend_score(df)
 
@@ -131,7 +192,7 @@ def _kpis(df: pd.DataFrame) -> list[dict[str, str]]:
     ]
 
 
-def _mix(df: pd.DataFrame, col: str, *, label_map: dict | None = None,
+def mix(df: pd.DataFrame, col: str, *, label_map: dict | None = None,
          top: int = 8) -> list[tuple[str, float]]:
     """Cơ cấu (đếm bài) theo 1 cột — trả [(nhãn, số bài)]."""
     s = df[col].replace("", pd.NA).dropna()
@@ -143,7 +204,7 @@ def _mix(df: pd.DataFrame, col: str, *, label_map: dict | None = None,
     return out
 
 
-def _timeline(df: pd.DataFrame) -> dict[str, Any]:
+def timeline(df: pd.DataFrame) -> dict[str, Any]:
     """Chuỗi số bài theo tuần, tách theo nền tảng (line chart đa chuỗi)."""
     if "week" not in df.columns or df["week"].isna().all():
         return {"x_labels": [], "series": []}
@@ -189,15 +250,17 @@ def _creator_scorecard(df: pd.DataFrame, top: int = 20) -> pd.DataFrame:
              .agg(so_video=("item_id", "size"),
                   eng_tb=("eng_total", "mean"),
                   eng_tong=("eng_total", "sum"),
-                  trend_tb=("trend_score", "mean"),
-                  eng_std=("eng_total", "std"))
+                  trend_tb=("trend_score", "mean"))
              .reset_index())
     agg = agg[agg["so_video"] >= 2].copy()
     if agg.empty:
         return pd.DataFrame()
-    # Độ đều = 1 - hệ số biến thiên (càng cao càng đều tay).
-    agg["do_deu"] = (1 - agg["eng_std"] / agg["eng_tb"].replace(0, pd.NA)).clip(0, 1)
-    agg["do_deu"] = agg["do_deu"].fillna(0).round(2)
+    # Độ đều dùng thang tứ phân vị (bền với bài viral lẻ) — xem analysis.py.
+    from kit.dashboard.analysis import consistency_score
+    deu = (d.groupby("creator_hash")["eng_total"]
+             .apply(consistency_score).rename("do_deu").reset_index())
+    agg = agg.merge(deu, on="creator_hash", how="left")
+    agg["do_deu"] = agg["do_deu"].fillna(0)
     # Velocity WoW (dùng lại kit.enrich.velocity).
     try:
         vel = weekly_velocity(d, key="creator_hash", metric="eng_total")
@@ -213,7 +276,7 @@ def _creator_scorecard(df: pd.DataFrame, top: int = 20) -> pd.DataFrame:
                  "trend_tb", "do_deu", "velocity"]].reset_index(drop=True))
 
 
-def _hook_lab(df: pd.DataFrame) -> dict[str, Any]:
+def hook_lab(df: pd.DataFrame) -> dict[str, Any]:
     """
     Mỏ hook/hashtag: top hashtag, phân bố công thức hook, và ví dụ tiêu biểu.
     """
@@ -255,7 +318,7 @@ def _hook_lab(df: pd.DataFrame) -> dict[str, Any]:
             "examples": pattern_examples}
 
 
-def _opportunity(df: pd.DataFrame) -> list[dict[str, Any]]:
+def opportunity_map(df: pd.DataFrame) -> list[dict[str, Any]]:
     """
     Bản đồ cơ hội ngách theo từ khoá: trục X = số bài (độ bão hoà),
     trục Y = tương tác TB (sức hút). Ngách vàng = ít bài + tương tác cao.
@@ -302,14 +365,14 @@ def compute_sections(df: pd.DataFrame) -> dict[str, Any]:
     """Tổng hợp toàn bộ dữ liệu cần cho render dashboard."""
     return {
         "kpis": _kpis(df),
-        "platform_mix": _mix(df, "platform", label_map=PLATFORM_LABELS),
-        "keyword_mix": _mix(df, "source_keyword"),
-        "format_mix": _mix(df, "format"),
-        "timeline": _timeline(df),
+        "platform_mix": mix(df, "platform", label_map=PLATFORM_LABELS),
+        "keyword_mix": mix(df, "source_keyword"),
+        "format_mix": mix(df, "format"),
+        "timeline": timeline(df),
         "trend": _trend_table(df),
         "creators": _creator_scorecard(df),
-        "hooks": _hook_lab(df),
-        "opportunity": _opportunity(df),
+        "hooks": hook_lab(df),
+        "opportunity": opportunity_map(df),
         "platforms_present": sorted(df["platform"].unique().tolist()),
         "keywords_present": sorted(
             df["source_keyword"].replace("", pd.NA).dropna().unique().tolist()),

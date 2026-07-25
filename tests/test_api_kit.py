@@ -132,3 +132,78 @@ def test_angle_brief_validate_product_ngan(client, project_files):
     resp = client.post("/kit/angle-brief",
                        json={"angle_jsonl": "angles.jsonl", "product": "x"})
     assert resp.status_code == 422
+
+
+# ---------------------------------------------------------------------------
+# /kit/dashboard
+# ---------------------------------------------------------------------------
+
+@pytest.fixture
+def dashboard_file(project_files):
+    """File raw đúng chữ ký Douyin (search mode) trong PROJECT_ROOT tạm."""
+    df = pd.DataFrame({
+        "aweme_id": ["a1", "a2"],
+        "title": ["4 招 kiếm tiền #副业", "教程 mới #AI"],
+        "desc": ["", ""],
+        "create_time": [1760000000, 1761000000],
+        "nickname": ["a***a", "b***b"],
+        "creator_hash": ["h1", "h2"],
+        "liked_count": [1000, 2000], "collected_count": [500, 400],
+        "comment_count": [50, 80], "share_count": [20, 30],
+        "aweme_url": ["https://douyin.com/video/1", "https://douyin.com/video/2"],
+        "cover_url": ["https://c/1.jpg", "https://c/2.jpg"],
+        "video_download_url": ["https://dl/1.mp4", "https://dl/2.mp4"],
+        "music_download_url": ["", ""],
+        "source_keyword": ["kw", "kw"],
+    })
+    df.to_excel(project_files / "douyin_search_kw.xlsx", index=False)
+    return project_files
+
+
+def test_dashboard_auto_sinh_html(client, dashboard_file):
+    resp = client.post("/kit/dashboard",
+                       json={"files": ["douyin_search_kw.xlsx"],
+                             "out": "reports/d.html"})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["status"] == "ok" and body["report"] == "d.html"
+    html = (dashboard_file / "reports" / "d.html").read_text(encoding="utf-8")
+    assert "SEARCH MODE" in html          # auto chọn đúng loại theo mode cào
+
+
+def test_dashboard_profile_chi_dinh(client, dashboard_file):
+    resp = client.post("/kit/dashboard",
+                       json={"files": ["douyin_search_kw.xlsx"],
+                             "profile": "creator", "out": "reports/c.html"})
+    assert resp.status_code == 200
+    html = (dashboard_file / "reports" / "c.html").read_text(encoding="utf-8")
+    assert "CREATOR MODE" in html
+
+
+def test_dashboard_all_tra_index(client, dashboard_file):
+    resp = client.post("/kit/dashboard",
+                       json={"files": ["douyin_search_kw.xlsx"],
+                             "profile": "all", "out_dir": "reports"})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert "index_url" in body
+    assert {"search", "overview", "index"} <= set(body["reports"])
+
+
+def test_dashboard_profile_sai_bi_validate(client, dashboard_file):
+    resp = client.post("/kit/dashboard",
+                       json={"files": ["douyin_search_kw.xlsx"],
+                             "profile": "khong-ton-tai"})
+    assert resp.status_code == 422
+
+
+def test_dashboard_file_khong_ton_tai(client, dashboard_file):
+    resp = client.post("/kit/dashboard", json={"files": ["khong_co.xlsx"]})
+    assert resp.status_code == 404
+
+
+def test_dashboard_chan_path_traversal(client, dashboard_file):
+    resp = client.post("/kit/dashboard",
+                       json={"files": ["douyin_search_kw.xlsx"],
+                             "out": "../escape.html"})
+    assert resp.status_code == 400

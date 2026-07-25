@@ -168,6 +168,42 @@ _ADAPTERS = {
 }
 
 
+# Cột đích cho bình luận (sheet "Comments" của MediaCrawler).
+COMMENT_COLS: list[str] = [
+    "platform", "comment_id", "item_id", "content", "create_time",
+    "nickname", "creator_hash", "like_count", "sub_comment_count",
+    "parent_comment_id",
+]
+
+# Khoá nối bình luận -> bài, tuỳ nền tảng.
+_COMMENT_ITEM_KEYS = ("aweme_id", "note_id", "video_id", "item_id",
+                      "content_id", "tieba_id")
+
+
+def adapt_comments(df: pd.DataFrame, *, platform: str | None = None) -> pd.DataFrame:
+    """
+    Chuẩn hoá sheet "Comments" về khung chung (khoá nối là `item_id`).
+
+    Mỗi nền tảng đặt tên khoá bài khác nhau (aweme_id / note_id / video_id) —
+    hàm này dò lần lượt và map về `item_id`.
+    """
+    if df is None or df.empty:
+        return pd.DataFrame(columns=COMMENT_COLS)
+    out = pd.DataFrame(index=df.index)
+    out["platform"] = platform or "unknown"
+    out["comment_id"] = _col(df, "comment_id").astype(str)
+    key = next((k for k in _COMMENT_ITEM_KEYS if k in df.columns), None)
+    out["item_id"] = df[key].astype(str) if key else ""
+    out["content"] = _col(df, "content")
+    out["create_time"] = _col(df, "create_time", 0)
+    out["nickname"] = _col(df, "nickname")
+    out["creator_hash"] = _col(df, "creator_hash")
+    out["like_count"] = _col(df, "like_count", 0)
+    out["sub_comment_count"] = _col(df, "sub_comment_count", 0)
+    out["parent_comment_id"] = _col(df, "parent_comment_id")
+    return out
+
+
 def adapt(df: pd.DataFrame, *, source: str | None = None) -> pd.DataFrame:
     """
     Chuyển 1 DataFrame raw (đã đọc từ file) sang schema hợp nhất.
