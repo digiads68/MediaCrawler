@@ -74,6 +74,10 @@ async def update_bilibili_video(video_item: Dict):
         "video_comment": str(video_item_stat.get("reply", "")),
         "last_modify_ts": utils.get_current_timestamp(),
         "video_url": f"https://www.bilibili.com/video/av{video_id}",
+        # Direct stream link (mp4/flv), fetched by attach_video_download_url. Bilibili
+        # signs this to the crawling session/IP with a short expiry, so it should be
+        # used soon after crawling rather than treated as a permanent link.
+        "download_url": video_item.get("_download_url", ""),
         "video_cover_url": video_item_view.get("pic", ""),
         "source_keyword": source_keyword_var.get(),
     }

@@ -190,6 +190,97 @@ def line(series: Sequence[dict], x_labels: Sequence[str], *,
     )
 
 
+def heatmap(rows: Sequence[str], cols: Sequence[str],
+            values: Sequence[Sequence[float | None]], *,
+            title: str = "", unit: str = "", cell: int = 34,
+            color_idx: int = 1, row_label_w: int = 116) -> str:
+    """
+    Bản đồ nhiệt hàng × cột — trả SVG inline.
+
+    Dùng cho câu hỏi kiểu "format nào ghép hook nào thì ăn" (Format Playbook) và
+    "từ khoá nào mạnh ở nền tảng nào" (Cross-platform).
+
+    Sắc độ thể hiện bằng `opacity` trên `var(--c-{color_idx})` thay vì một thang
+    màu rời: nhờ đó tự chạy đúng ở cả theme sáng và tối mà KHÔNG phải thêm biến
+    màu mới (biến màu đang khai 3 lần trong `_CSS`, thêm 1 biến là phải sửa cả 3).
+
+    `None` (không phải 0) = KHÔNG ĐO ĐƯỢC -> ô xám kèm "—". Phân biệt này là bắt
+    buộc: khi so sánh chéo nền tảng, Kuaishou không có comment/share, vẽ thành 0
+    sẽ nói sai rằng nó bằng 0.
+
+    Args:
+        rows: nhãn hàng. cols: nhãn cột.
+        values: values[i][j] ứng với rows[i] × cols[j]; None = n/a.
+        unit: hậu tố trong tooltip (vd "%", "bài").
+        cell: cạnh 1 ô (px). color_idx: 1..6 theo var(--c-N).
+    """
+    if not rows or not cols:
+        return _empty(cell * 6, "Không đủ dữ liệu")
+
+    nums = [v for row in values for v in row
+            if v is not None and not _is_nan(v)]
+    vmax = max(nums) if nums else 0.0
+    if vmax <= 0:
+        return _empty(cell * 6, "Không đủ dữ liệu")
+
+    top_h = 34                      # chỗ cho nhãn cột (xoay chéo)
+    w = row_label_w + len(cols) * cell + 8
+    h = top_h + len(rows) * cell + 6
+    parts: list[str] = []
+
+    # Nhãn cột — xoay 35 độ để nhãn dài không chồng nhau
+    for j, c in enumerate(cols):
+        cx = row_label_w + j * cell + cell / 2
+        parts.append(
+            f'<text x="{cx:.1f}" y="{top_h - 8}" class="hm-lbl" '
+            f'text-anchor="end" transform="rotate(-35 {cx:.1f} {top_h - 8})">'
+            f'{_esc(str(c)[:14])}</text>')
+
+    for i, r in enumerate(rows):
+        y = top_h + i * cell
+        parts.append(
+            f'<text x="{row_label_w - 8}" y="{y + cell / 2 + 4:.1f}" '
+            f'class="hm-lbl" text-anchor="end">{_esc(str(r)[:16])}</text>')
+        for j in range(len(cols)):
+            x = row_label_w + j * cell
+            v = values[i][j] if j < len(values[i]) else None
+            if v is None or _is_nan(v):
+                parts.append(
+                    f'<rect x="{x}" y="{y}" width="{cell - 2}" height="{cell - 2}" '
+                    f'rx="3" fill="var(--surface-2)"/>'
+                    f'<title>{_esc(r)} × {_esc(c := cols[j])}: không đo được</title>'
+                    f'<text x="{x + (cell - 2) / 2:.1f}" y="{y + cell / 2 + 3:.1f}" '
+                    f'class="hm-cell-txt" text-anchor="middle" '
+                    f'fill="var(--muted)">—</text>')
+                continue
+            frac = float(v) / vmax if vmax else 0.0
+            op = 0.08 + 0.92 * max(0.0, min(1.0, frac))
+            # Ô đậm -> chữ dùng màu nền để đủ tương phản
+            fill = "var(--surface)" if op > 0.6 else "var(--ink-2)"
+            parts.append(
+                f'<rect x="{x}" y="{y}" width="{cell - 2}" height="{cell - 2}" '
+                f'rx="3" fill="var(--c-{color_idx})" opacity="{op:.2f}">'
+                f'<title>{_esc(r)} × {_esc(cols[j])}: {_fmt(float(v))}{_esc(unit)}'
+                f'</title></rect>'
+                f'<text x="{x + (cell - 2) / 2:.1f}" y="{y + cell / 2 + 3:.1f}" '
+                f'class="hm-cell-txt" text-anchor="middle" fill="{fill}">'
+                f'{_fmt(float(v))}</text>')
+
+    ttl = f'<div class="chart-title">{_esc(title)}</div>' if title else ""
+    return (f'<div class="chart-heatmap">{ttl}'
+            f'<svg viewBox="0 0 {w} {h}" width="100%" role="img" '
+            f'aria-label="{_esc(title or "ban do nhiet")}">'
+            f'{"".join(parts)}</svg></div>')
+
+
+def _is_nan(v: object) -> bool:
+    """True nếu là NaN (float('nan') != chính nó)."""
+    try:
+        return v != v  # type: ignore[comparison-overlap]
+    except Exception:  # noqa: BLE001
+        return False
+
+
 def _empty(size: int, msg: str) -> str:
     """Khối trống khi thiếu dữ liệu — vẫn giữ layout."""
     return (f'<div class="chart-empty" style="min-height:{size // 2}px">'

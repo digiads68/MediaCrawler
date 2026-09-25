@@ -22,9 +22,11 @@ API_BASE_DEFAULT = os.getenv("MEDIACRAWLER_API", "http://127.0.0.1:8080")
 POLL_INTERVAL_S = 15.0
 CRAWL_TIMEOUT_S = 3600.0
 
-# Lệnh analyzer được phép chạy sau crawl
-ANALYZE_COMMANDS = {"trend", "insight", "koc", "opportunity", "seasonal",
-                    "price", "sov", "angle"}
+# Lệnh analyzer được phép chạy sau crawl — đọc từ registry để không lệch giữa
+# analyzer / API / MCP / WebUI (trước đây danh sách này bị nhân bản 5 nơi).
+from kit.analyzer.registry import COMMANDS as _REGISTRY_COMMANDS  # noqa: E402
+
+ANALYZE_COMMANDS = set(_REGISTRY_COMMANDS)
 
 
 def _run_analyzer(command: str, file_path: str, to_supabase: bool = False,
@@ -115,6 +117,30 @@ def _run_analyzer(command: str, file_path: str, to_supabase: bool = False,
         xlsx_files = ["angle_library.jsonl"]
         if writer:
             writer.upsert_angles(records)
+    elif command == "hook":
+        res = an.hook_lab(df)
+        rows = len(res["top_posts"])
+        report_data = res
+        xlsx_files = ["CS12_hook_lab_types.xlsx", "CS12_hook_lab_top.xlsx"]
+    elif command == "sound":
+        res = an.sound_edit_kit(df)
+        rows = len(res["shelf"])
+        report_data = res
+        xlsx_files = ["CS13_edit_kit.xlsx"]
+        if len(res.get("sounds", [])):
+            xlsx_files.insert(0, "CS10_sound_watchlist.xlsx")
+    elif command == "moodboard":
+        res = an.cover_moodboard(df)
+        rows = len(res["board"])
+        report_data = res
+        xlsx_files = ["CS15_cover_moodboard.xlsx"]
+    elif command == "playbook":
+        res = an.format_playbook(df)
+        rows = len(res["stats"])
+        report_data = res
+        xlsx_files = ["CS14_format_playbook.xlsx"]
+        if len(res.get("unclassified", [])):
+            xlsx_files.append("CS14_format_unclassified.xlsx")
     elif command == "sov":
         bm = json.loads(Path(brand_map).read_text(encoding="utf-8")) if brand_map else {}
         g = an.sov(df, bm)
@@ -131,9 +157,17 @@ def _run_analyzer(command: str, file_path: str, to_supabase: bool = False,
     reports = list(xlsx_files)
     try:
         from kit.report import build_report
+        from kit.report.html_report import report_slug
+        # Slug theo nền tảng+từ khoá để chạy cùng 1 lệnh cho 2 nền tảng không
+        # ghi đè báo cáo của nhau. Không suy được gì -> slug rỗng -> giữ tên cũ.
+        df_platform = ""
+        if "platform" in df.columns and df["platform"].notna().any():
+            df_platform = str(df["platform"].dropna().iloc[0])
+        slug = report_slug(platform or df_platform, keyword)
         html_path = build_report(command, report_data, df=df,
                                   meta={"keyword": keyword, "platform": platform,
-                                        "source_file": Path(file_path).name})
+                                        "source_file": Path(file_path).name},
+                                  slug=slug)
         reports.append(html_path.name)
     except Exception as exc:  # noqa: BLE001
         logger.warning("Không sinh được báo cáo HTML (%s): %s", command, exc)
@@ -159,17 +193,78 @@ async def _wait_until_idle(client: httpx.AsyncClient, poll_interval: float,
     return "timeout"
 
 
-async def _latest_data_file(client: httpx.AsyncClient, platform: str) -> str | None:
-    """Lấy đường dẫn file dữ liệu mới nhất của platform từ /api/data/files."""
+def _mtime(f: dict[str, Any]) -> float:
+    """
+    Thời điểm sửa của 1 file dạng số, để so sánh/sắp xếp được.
+
+    `/api/data/files` trả epoch float, nhưng dữ liệu tổng hợp (và một số client)
+    có thể đưa chuỗi ISO — nhận cả hai để không lẫn kiểu khi sort.
+    """
+    v = f.get("modified_at")
+    if v is None or v == "":
+        return 0.0
+    if isinstance(v, (int, float)):
+        return float(v)
+    s = str(v)
+    try:
+        return float(s)
+    except ValueError:
+        pass
+    try:
+        from datetime import datetime
+        return datetime.fromisoformat(s.replace("Z", "+00:00")).timestamp()
+    except ValueError:
+        return 0.0
+
+
+def pick_data_file(files: list[dict[str, Any]], *, role: str = "",
+                   since_ts: float | None = None) -> str | None:
+    """
+    Chọn 1 file dữ liệu theo VAI TRÒ, không chỉ theo thời gian sửa.
+
+    Vì sao không lấy đơn thuần "file mới nhất":
+      - Chế độ json/jsonl ghi HAI file cùng thư mục (`search_contents_<ngày>` và
+        `search_comments_<ngày>`), nên "mới nhất" có thể là file bình luận trong
+        khi ta cần file bài đăng (hoặc ngược lại với Voice-of-Customer).
+      - `since_ts` chặn việc nhận file của lần cào TRƯỚC rồi tưởng là vừa cào —
+        đây là cách một job có thể âm thầm phân tích dữ liệu cũ.
+
+    role: "comments" | "posts" | "" (không quan tâm).
+    """
+    if not files:
+        return None
+    items = list(files)
+    if since_ts is not None:
+        fresh = [f for f in items if _mtime(f) >= since_ts]
+        items = fresh or []
+        if not items:
+            return None
+    if role:
+        def is_comments(f: dict[str, Any]) -> bool:
+            return "comment" in str(f.get("path") or f.get("name") or "").lower()
+        want_comments = role == "comments"
+        matched = [f for f in items if is_comments(f) == want_comments]
+        if not matched:
+            return None
+        items = matched
+    items.sort(key=_mtime, reverse=True)
+    return items[0].get("path") or items[0].get("name")
+
+
+async def _latest_data_file(client: httpx.AsyncClient, platform: str, *,
+                            role: str = "",
+                            since_ts: float | None = None) -> str | None:
+    """
+    Lấy đường dẫn file dữ liệu mới nhất của platform từ /api/data/files.
+
+    `role`/`since_ts` là keyword-only có mặc định để chữ ký cũ vẫn dùng được.
+    """
     resp = await client.get("/api/data/files", params={"platform": platform})
     resp.raise_for_status()
     files = resp.json()
     if isinstance(files, dict):
         files = files.get("files", [])
-    if not files:
-        return None
-    files = sorted(files, key=lambda f: f.get("modified_at", ""), reverse=True)
-    return files[0].get("path") or files[0].get("name")
+    return pick_data_file(files or [], role=role, since_ts=since_ts)
 
 
 async def crawl_and_analyze(ctx: dict[str, Any], platform: str,

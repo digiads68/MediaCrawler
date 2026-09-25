@@ -134,6 +134,98 @@ def test_build_report_du_lieu_rong_khong_loi(_in_tmp):
     assert "Không có dữ liệu" in p.read_text(encoding="utf-8")
 
 
+class TestLinkTaiVideo:
+    """
+    Link tải trong báo cáo: bấm link CDN chỉ phát inline, nên cần nút tải riêng
+    đi qua proxy /kit/media/download (xem kit/media_urls.py).
+    """
+
+    @staticmethod
+    def _trend(top: pd.DataFrame):
+        return {"top_posts": top,
+                "formats": pd.DataFrame({"format": ["x"], "so_bai": [1],
+                                         "diem_tb": [1.0], "save_tb": [1.0]}),
+                "sounds": pd.DataFrame()}
+
+    def _base_cols(self, **extra):
+        cols = {"title": ["Bài A"], "format": ["x"], "source_keyword": ["k"],
+                "liked_count": [10], "collected_count": [2], "share_count": [1],
+                "trend_score": [50.0]}
+        cols.update(extra)
+        return pd.DataFrame(cols)
+
+    def test_douyin_co_ca_xem_trang_va_tai_file(self, _in_tmp):
+        top = self._base_cols(
+            aweme_url=["https://www.douyin.com/video/123"],
+            video_download_url=["https://www.douyin.com/aweme/v1/play/?video_id=v1"])
+        html = build_report("trend", self._trend(top),
+                            meta={"generated": "x"}).read_text(encoding="utf-8")
+        # Trang xem giữ link gốc
+        assert 'href="https://www.douyin.com/video/123"' in html
+        # File media đi qua proxy để buộc tải về
+        assert "/kit/media/download?url=" in html
+        assert 'class="mcard-dl"' in html
+
+    def test_xhs_video_url_la_mp4_nen_duoc_coi_la_link_tai(self, _in_tmp):
+        """xhs: note_url = trang xem, video_url = mp4 trên CDN (ngược với bilibili)."""
+        top = self._base_cols(
+            note_url=["https://www.xiaohongshu.com/explore/abc"],
+            video_url=["http://sns-v11.rednotecdn.com/stream/1/110/259/x.mp4"])
+        html = build_report("trend", self._trend(top),
+                            meta={"generated": "x"}).read_text(encoding="utf-8")
+        assert 'href="https://www.xiaohongshu.com/explore/abc"' in html
+        assert "/kit/media/download?url=" in html
+        assert "rednotecdn.com" in html      # url gốc được encode trong link proxy
+
+    def test_bilibili_video_url_la_trang_xem_nen_khong_thanh_link_tai(self, _in_tmp):
+        """bilibili: video_url là bilibili.com/video/av... -> chỉ xem, không phải file."""
+        top = self._base_cols(video_url=["https://www.bilibili.com/video/av123"])
+        html = build_report("trend", self._trend(top),
+                            meta={"generated": "x"}).read_text(encoding="utf-8")
+        assert 'href="https://www.bilibili.com/video/av123"' in html
+        assert 'class="mcard-dl"' not in html        # không có file trực tiếp -> không có nút tải
+
+    def test_bilibili_download_url_thanh_link_tai(self, _in_tmp):
+        top = self._base_cols(
+            video_url=["https://www.bilibili.com/video/av123"],
+            download_url=["https://cn-1.bilivideo.com/upgcxcode/x.m4s"])
+        html = build_report("trend", self._trend(top),
+                            meta={"generated": "x"}).read_text(encoding="utf-8")
+        assert 'class="mcard-dl"' in html
+        assert "/kit/media/download?url=" in html
+
+    def test_khong_co_link_media_thi_khong_hien_nut_tai(self, _in_tmp):
+        top = self._base_cols(aweme_url=["https://www.douyin.com/video/123"])
+        html = build_report("trend", self._trend(top),
+                            meta={"generated": "x"}).read_text(encoding="utf-8")
+        assert 'class="mcard-dl"' not in html
+
+    def test_o_bang_co_link_tai_cho_cot_media(self, _in_tmp):
+        """Bảng sound watchlist: link nhạc là file -> phải có cả '▶ Nghe' và '⬇ Tải'."""
+        sounds = pd.DataFrame({
+            "music_download_url": ["https://lf3-music.douyinstatic.com/obj/abc"],
+            "so_video": [3], "eng_tb": [100.0]})
+        result = {"top_posts": self._base_cols(aweme_url=["https://douyin.com/v/1"]),
+                  "formats": pd.DataFrame({"format": ["x"], "so_bai": [1],
+                                           "diem_tb": [1.0], "save_tb": [1.0]}),
+                  "sounds": sounds}
+        html = build_report("trend", result,
+                            meta={"generated": "x"}).read_text(encoding="utf-8")
+        assert "▶ Nghe" in html
+        assert 'class="dl-link"' in html
+
+    def test_url_duoc_encode_an_toan_trong_link_proxy(self, _in_tmp):
+        """URL có & và = phải được encode, không phá cấu trúc query của proxy."""
+        top = self._base_cols(
+            aweme_url=["https://www.douyin.com/video/123"],
+            video_download_url=[
+                "https://www.douyin.com/aweme/v1/play/?video_id=v1&sign=a&line=0"])
+        html = build_report("trend", self._trend(top),
+                            meta={"generated": "x"}).read_text(encoding="utf-8")
+        # & của URL gốc phải thành %26, không được để nguyên (sẽ bị hiểu là tham số proxy)
+        assert "%26sign%3D" in html
+
+
 def test_escape_chong_html_injection(_in_tmp):
     top = pd.DataFrame({
         "title": ["<script>alert(1)</script>"], "format": ["x"],

@@ -22,7 +22,10 @@ PLATFORM = "xhs"  # Platform, xhs | dy | ks | bili | wb | tieba | zhihu
 
 # 是否使用海外版小红书 (rednote.com)
 # 开启后 API 走 webapi.rednote.com，cookie 域使用 .rednote.com
-XHS_INTERNATIONAL = False
+# Bật True: IP Việt Nam bị xiaohongshu.com tự redirect sang rednote.com sau khi đăng nhập,
+# nếu để False thì cookie lưu domain .xiaohongshu.com sẽ không khớp domain thực tế -> mất
+# session, phải quét QR lại mỗi lần.
+XHS_INTERNATIONAL = True
 
 KEYWORDS = "编程副业,编程兼职"  # Keyword search configuration, separated by English commas
 LOGIN_TYPE = "qrcode"  # qrcode or phone or cookie

@@ -10,9 +10,10 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Literal
+from urllib.parse import quote
 
-from fastapi import APIRouter, HTTPException
-from fastapi.responses import FileResponse
+from fastapi import APIRouter, HTTPException, Query
+from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
 router = APIRouter(prefix="/kit", tags=["kit"])
@@ -111,6 +112,102 @@ def kit_report(name: str) -> FileResponse:
         # Không đặt filename -> Content-Disposition inline -> trình duyệt render
         return FileResponse(path, media_type="text/html; charset=utf-8")
     return FileResponse(path, filename=name)
+
+
+@router.get("/media/download")
+async def kit_media_download(
+    url: str = Query(..., description="Link media gốc trên CDN nền tảng"),
+    name: str | None = Query(default=None, description="Tên file mong muốn"),
+) -> StreamingResponse:
+    """
+    Tải file media về máy qua proxy — buộc trình duyệt tải xuống thay vì phát inline.
+
+    Vì sao cần: CDN nền tảng trả `Content-Type: video/mp4` mà không kèm
+    `Content-Disposition: attachment`, nên bấm link trực tiếp trong HTML thì
+    trình duyệt phát video inline; thuộc tính `download` của thẻ <a> bị bỏ qua
+    do khác origin. Endpoint này gắn Referer đúng nền tảng (CDN Bilibili/Douyin
+    đòi Referer) rồi stream lại kèm header attachment.
+
+    An toàn: chỉ nhận URL thuộc whitelist CDN/host của 7 nền tảng (chặn SSRF).
+    """
+    import httpx
+
+    from kit.media_urls import (BROWSER_UA, is_allowed_for_proxy, referer_for,
+                                safe_filename)
+    from tools.httpx_util import make_async_client
+
+    if not is_allowed_for_proxy(url):
+        raise HTTPException(
+            status_code=400,
+            detail="Link không thuộc CDN của các nền tảng được hỗ trợ "
+                   "(chỉ tải media từ Douyin/Xiaohongshu-rednote/Bilibili/"
+                   "Kuaishou/Weibo/Zhihu/Tieba).")
+
+    headers = {"User-Agent": BROWSER_UA}
+    referer = referer_for(url)
+    if referer:
+        headers["Referer"] = referer
+
+    client = make_async_client(timeout=httpx.Timeout(30.0, read=300.0),
+                               follow_redirects=True)
+    try:
+        req = client.build_request("GET", url, headers=headers)
+        upstream = await client.send(req, stream=True)
+    except httpx.HTTPError as exc:
+        await client.aclose()
+        raise HTTPException(status_code=502,
+                            detail=f"Không tải được từ CDN: {exc}") from exc
+
+    if upstream.status_code >= 400:
+        code = upstream.status_code
+        await upstream.aclose()
+        await client.aclose()
+        raise HTTPException(
+            status_code=502,
+            detail=f"CDN trả lỗi {code} — link có thể đã hết hạn, "
+                   f"cần cào lại để lấy link mới.")
+
+    content_type = upstream.headers.get("content-type", "application/octet-stream")
+    filename = safe_filename(url, name, content_type)
+
+    async def _body():
+        try:
+            async for chunk in upstream.aiter_bytes(65536):
+                yield chunk
+        finally:
+            await upstream.aclose()
+            await client.aclose()
+
+    out_headers = {
+        # filename* (RFC 5987) để tên tiếng Việt/Trung không vỡ
+        "Content-Disposition": f"attachment; filename*=UTF-8''{quote(filename)}",
+    }
+    if "content-length" in upstream.headers:
+        out_headers["Content-Length"] = upstream.headers["content-length"]
+
+    return StreamingResponse(_body(), media_type=content_type,
+                             headers=out_headers)
+
+
+@router.get("/analyze/capabilities")
+def kit_analyze_capabilities(file: str = Query(..., description="File dữ liệu")) -> dict:
+    """
+    Soi 1 file dữ liệu -> cho biết dashboard nào chạy được, cái nào không & vì sao.
+
+    WebUI dùng để chỉ bật những dashboard mà dữ liệu thực sự đỡ được, tránh
+    người dùng chọn rồi mới báo lỗi (vd Voice of Customer cần file comment,
+    Seasonal cần create_time).
+    """
+    from kit.analyzer.capabilities import inspect_data_file
+
+    data_file = _resolve_in_project(file)
+    try:
+        return inspect_data_file(str(data_file))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=422,
+                            detail=f"Không đọc được file: {exc}") from exc
 
 
 @router.post("/angle-brief")

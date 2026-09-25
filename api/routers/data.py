@@ -65,7 +65,16 @@ async def list_data_files(platform: Optional[str] = None, file_type: Optional[st
         return {"files": []}
 
     files = []
-    supported_extensions = {".json", ".csv", ".xlsx", ".xls"}
+    supported_extensions = {".json", ".jsonl", ".csv", ".xlsx", ".xls"}
+
+    # Thư mục dữ liệu của nền tảng cần lọc. Không so khớp chuỗi con của đường
+    # dẫn nữa: mã nền tảng KHÁC tên thư mục (`dy` -> `data/douyin/`,
+    # `ks` -> `data/kuaishou/`, `wb` -> `data/weibo/`), nên lọc kiểu cũ trả về
+    # rỗng cho 3 nền tảng đó — MCP luôn báo "chưa thấy file kết quả" dù cào xong.
+    platform_dirs: tuple[str, ...] = ()
+    if platform:
+        from kit.enrich.schema import dirs_for
+        platform_dirs = dirs_for(platform)
 
     for root, dirs, filenames in os.walk(DATA_DIR):
         root_path = Path(root)
@@ -74,10 +83,10 @@ async def list_data_files(platform: Optional[str] = None, file_type: Optional[st
             if file_path.suffix.lower() not in supported_extensions:
                 continue
 
-            # Platform filter
-            if platform:
-                rel_path = str(file_path.relative_to(DATA_DIR))
-                if platform.lower() not in rel_path.lower():
+            # Platform filter — khớp theo TÊN THƯ MỤC, không phải chuỗi con
+            if platform_dirs:
+                parts = {p.lower() for p in file_path.relative_to(DATA_DIR).parts}
+                if not parts & set(platform_dirs):
                     continue
 
             # Type filter
@@ -121,6 +130,25 @@ async def get_file_content(file_path: str, preview: bool = True, limit: int = 10
                     if isinstance(data, list):
                         return {"data": data[:limit], "total": len(data)}
                     return {"data": data, "total": 1}
+            elif full_path.suffix == ".jsonl":
+                # 1 JSON object mỗi dòng. Cần nhánh riêng vì json.load() không
+                # đọc được định dạng này — mà `jsonl` lại là save_option MẶC ĐỊNH
+                # của crawl detail, nên thiếu nhánh này thì luồng đó luôn lỗi.
+                rows = []
+                total = 0
+                with open(full_path, "r", encoding="utf-8") as f:
+                    for line in f:
+                        line = line.strip()
+                        if not line:
+                            continue
+                        total += 1
+                        if len(rows) < limit:
+                            try:
+                                rows.append(json.loads(line))
+                            except json.JSONDecodeError:
+                                continue
+                cols = list(rows[0].keys()) if rows and isinstance(rows[0], dict) else []
+                return {"data": rows, "total": total, "columns": cols}
             elif full_path.suffix == ".csv":
                 import csv
                 with open(full_path, "r", encoding="utf-8") as f:

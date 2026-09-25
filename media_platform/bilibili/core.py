@@ -239,6 +239,7 @@ class BilibiliCrawler(AbstractCrawler):
                 for video_item in video_items:
                     if video_item:
                         video_id_list.append(video_item.get("View").get("aid"))
+                        await self.attach_video_download_url(video_item, semaphore)
                         await bilibili_store.update_bilibili_video(video_item)
                         await bilibili_store.update_up_info(video_item)
                         await self.download_media(video_item, semaphore)
@@ -319,6 +320,7 @@ class BilibiliCrawler(AbstractCrawler):
                                 notes_count_this_day += 1
                                 total_notes_crawled_for_keyword += 1
                                 video_id_list.append(video_item.get("View").get("aid"))
+                                await self.attach_video_download_url(video_item, semaphore)
                                 await bilibili_store.update_bilibili_video(video_item)
                                 await bilibili_store.update_up_info(video_item)
                                 await self.download_media(video_item, semaphore)
@@ -424,6 +426,7 @@ class BilibiliCrawler(AbstractCrawler):
                 video_aid: str = video_item_view.get("aid")
                 if video_aid:
                     video_aids_list.append(video_aid)
+                await self.attach_video_download_url(video_detail, semaphore)
                 await bilibili_store.update_bilibili_video(video_detail)
                 await bilibili_store.update_up_info(video_detail)
                 await self.download_media(video_detail, semaphore)
@@ -478,6 +481,39 @@ class BilibiliCrawler(AbstractCrawler):
             except KeyError as ex:
                 utils.logger.error(f"[BilibiliCrawler.get_video_play_url_task] have not fund play url from :{aid}|{cid}, err: {ex}")
                 return None
+
+    async def attach_video_download_url(self, video_item: Dict, semaphore: asyncio.Semaphore) -> None:
+        """
+        Fetch the highest-quality direct stream URL and attach it to video_item under
+        "_download_url", so store.update_bilibili_video can export it as a real
+        downloadable link (the default "video_url" field is only the watch-page URL,
+        not a direct media link). This is a lightweight metadata call (play address
+        only), independent of config.ENABLE_GET_MEDIA which controls actually
+        downloading the video file to disk. Must request MP4_FNVAL: the default
+        DASH format returns split audio/video tracks without any "durl" entry.
+        Note: bilibili signs these URLs to the requesting session/IP with a short
+        expiry, so the link should be used soon after crawling rather than stored
+        long-term.
+        """
+        video_item_view: Dict = video_item.get("View", {})
+        aid = video_item_view.get("aid")
+        cid = video_item_view.get("cid")
+        if not aid or not cid:
+            return
+        result = await self.get_video_play_url_task(
+            aid, cid, semaphore, fnval=bili_media.MP4_FNVAL
+        )
+        if not result:
+            return
+        durl_list = result.get("durl") or []
+        max_size = -1
+        download_url = ""
+        for durl in durl_list:
+            size = durl.get("size", 0)
+            if size > max_size:
+                max_size = size
+                download_url = durl.get("url", "")
+        video_item["_download_url"] = download_url
 
     async def create_bilibili_client(self, httpx_proxy: Optional[str]) -> BilibiliClient:
         """

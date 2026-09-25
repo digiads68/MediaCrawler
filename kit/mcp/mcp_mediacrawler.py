@@ -35,6 +35,8 @@ except ImportError:
     pass
 
 # ---- Cấu hình ----------------------------------------------------------------
+# API_BASE: địa chỉ MCP server dùng để GỌI vào REST API (luôn là localhost vì
+# MCP chạy cùng máy với API).
 API_BASE = os.environ.get("MEDIACRAWLER_API", "http://127.0.0.1:8080")
 POLL_INTERVAL_SEC = 5          # nhịp hỏi trạng thái
 POLL_TIMEOUT_SEC = 20 * 60     # trần thời gian chờ 1 lần crawl
@@ -44,6 +46,38 @@ DEFAULT_MAX_NOTES = 50         # trần mặc định an toàn, tránh quét n�
 MCP_TRANSPORT = os.environ.get("MCP_TRANSPORT", "stdio")
 MCP_HOST = os.environ.get("MCP_HOST", "127.0.0.1")
 MCP_PORT = int(os.environ.get("MCP_PORT", "8765"))
+
+
+def _detect_public_base() -> str:
+    """
+    Địa chỉ để agent Ở MÁY KHÁC mở được báo cáo (link trả về trong kết quả tool).
+
+    Không dùng API_BASE cho việc này: khi agent từ xa nối vào qua Tailscale,
+    `http://127.0.0.1:8080` trên máy nó lại trỏ về localhost của chính nó, nên
+    link báo cáo sẽ chết. Ở chế độ HTTP (remote) thì suy ra IP Tailscale của máy
+    này; đặt MEDIACRAWLER_PUBLIC_URL trong .env để ghi đè (vd dùng MagicDNS).
+    """
+    explicit = os.environ.get("MEDIACRAWLER_PUBLIC_URL", "").strip().rstrip("/")
+    if explicit:
+        return explicit
+    # stdio = agent chạy cùng máy -> localhost là đúng
+    if MCP_TRANSPORT == "stdio":
+        return API_BASE
+    try:
+        import subprocess
+        out = subprocess.run(["tailscale", "ip", "-4"], capture_output=True,
+                             text=True, timeout=5)
+        ip = (out.stdout or "").strip().splitlines()[0].strip() if out.stdout else ""
+        if ip:
+            port = API_BASE.rsplit(":", 1)[-1]
+            return f"http://{ip}:{port}"
+    except Exception:  # noqa: BLE001 — không dò được thì lùi về API_BASE
+        pass
+    return API_BASE
+
+
+# Base URL dùng trong link báo cáo trả cho agent
+PUBLIC_BASE = _detect_public_base()
 
 # Lệnh analyzer hợp lệ (khớp router /kit/analyze)
 ANALYZE_COMMANDS = ("trend", "insight", "koc", "opportunity",
@@ -261,7 +295,7 @@ async def analyze(
       "kit/config/brand_map.json").
 
     Trả về danh sách file báo cáo. Báo cáo HTML mở/đọc được tại
-    {API_BASE}/kit/reports/{tên_file} — agent có thể fetch URL đó để đọc phân
+    {PUBLIC_BASE}/kit/reports/{tên_file} — agent có thể fetch URL đó để đọc phân
     tích trực quan (bảng chỉ số, hook, link video để lấy ý tưởng/clone).
     """
     if command not in ANALYZE_COMMANDS:
@@ -287,8 +321,9 @@ async def analyze(
         "command": command,
         "rows": res.get("rows"),
         "reports": reports,
-        "report_urls": [f"{API_BASE}/kit/reports/{n}" for n in reports],
-        "hint": "Fetch report_urls (.html) để đọc phân tích trực quan; .xlsx để tải số liệu.",
+        "report_urls": [f"{PUBLIC_BASE}/kit/reports/{n}" for n in reports],
+        "hint": "Mở report_urls (.html) trên tab mới để xem dashboard (có link tải "
+                "video); .xlsx để tải số liệu.",
     }
 
 
@@ -300,7 +335,7 @@ async def list_reports() -> dict:
         r.raise_for_status()
         data = r.json()
     for item in data.get("reports", []):
-        item["full_url"] = f"{API_BASE}{item['url']}"
+        item["full_url"] = f"{PUBLIC_BASE}{item['url']}"
     return data
 
 
@@ -323,7 +358,7 @@ async def read_report(name: str) -> dict:
     txt = re.sub(r"<style[\s\S]*?</style>", "", html)
     txt = re.sub(r"<script[\s\S]*?</script>", "", txt)
     return {"ok": True, "name": name, "html": txt[:40000],
-            "url": f"{API_BASE}/kit/reports/{name}"}
+            "url": f"{PUBLIC_BASE}/kit/reports/{name}"}
 
 
 if __name__ == "__main__":

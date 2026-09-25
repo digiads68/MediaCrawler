@@ -1,6 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
-import { BarChart3, FileSpreadsheet, ExternalLink, Loader2, Sparkles } from 'lucide-react'
+import {
+  BarChart3, FileSpreadsheet, ExternalLink, Loader2, Sparkles, Ban, CheckCircle2,
+} from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -16,7 +18,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { kitApi, type KitCommand, type KitAnalyzeResult } from '@/lib/api'
+import {
+  kitApi,
+  type KitCommand,
+  type KitAnalyzeResult,
+  type KitCapabilitiesResult,
+} from '@/lib/api'
 import type { DataFile } from '@/types/crawler'
 import axios from 'axios'
 
@@ -48,8 +55,50 @@ export function AnalyzeDialog({ file, open, onOpenChange }: AnalyzeDialogProps) 
   const [running, setRunning] = useState(false)
   const [result, setResult] = useState<KitAnalyzeResult | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [caps, setCaps] = useState<KitCapabilitiesResult | null>(null)
+  const [capsLoading, setCapsLoading] = useState(false)
 
   const active = COMMANDS.find((c) => c.value === command)!
+  const activeCap = caps?.capabilities?.[command]
+  // Chưa soi được file (lỗi/đang tải) -> không khoá gì, để backend báo lỗi thật
+  const activeBlocked = activeCap ? !activeCap.supported : false
+
+  // Soi file mỗi lần mở dialog: chỉ bật dashboard mà dữ liệu thực sự đỡ được
+  useEffect(() => {
+    if (!open) return
+    let cancelled = false
+    setCapsLoading(true)
+    setCaps(null)
+    kitApi
+      .capabilities(`data/${file.path}`)
+      .then(({ data }) => {
+        if (cancelled) return
+        setCaps(data)
+        // Dashboard đang chọn không dùng được -> nhảy sang cái phù hợp nhất với
+        // loại dữ liệu (file bình luận thì Voice of Customer mới đúng việc)
+        const cur = data.capabilities?.[command]
+        if (cur && !cur.supported) {
+          const preferred: KitCommand[] =
+            data.kind === 'comments'
+              ? ['insight', 'price']
+              : ['trend', 'koc', 'opportunity', 'seasonal', 'sov', 'angle', 'price']
+          const order = [...preferred, ...COMMANDS.map((c) => c.value)]
+          const nextOk = order.find((v) => data.capabilities?.[v]?.supported)
+          if (nextOk) setCommand(nextOk)
+        }
+      })
+      .catch(() => {
+        // Soi lỗi thì thôi, vẫn cho chạy — analyzer sẽ báo lỗi cụ thể nếu có
+      })
+      .finally(() => {
+        if (!cancelled) setCapsLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+    // Chỉ chạy lại khi đổi file hoặc mở lại dialog (không phụ thuộc command)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, file.path])
 
   const handleRun = async () => {
     setRunning(true)
@@ -87,9 +136,25 @@ export function AnalyzeDialog({ file, open, onOpenChange }: AnalyzeDialogProps) 
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto min-h-0 mt-2 space-y-4">
-          {/* File nguồn */}
+          {/* File nguồn + kết quả soi dữ liệu */}
           <div className="text-xs font-mono text-cyber-text-muted">
             Nguồn: <span className="text-cyber-text-secondary">{file.name}</span>
+            {capsLoading && (
+              <span className="ml-2 inline-flex items-center gap-1 text-cyber-text-muted">
+                <Loader2 className="w-3 h-3 animate-spin" />
+                đang soi dữ liệu…
+              </span>
+            )}
+            {caps && (
+              <span className="ml-2 text-cyber-text-secondary">
+                · {caps.rows} dòng ·{' '}
+                {caps.kind === 'comments' ? 'dữ liệu bình luận' : 'dữ liệu bài đăng'} ·{' '}
+                {
+                  Object.values(caps.capabilities).filter((c) => c.supported).length
+                }
+                /{Object.keys(caps.capabilities).length} dashboard dùng được
+              </span>
+            )}
           </div>
 
           {/* Chọn loại phân tích */}
@@ -102,14 +167,45 @@ export function AnalyzeDialog({ file, open, onOpenChange }: AnalyzeDialogProps) 
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {COMMANDS.map((c) => (
-                  <SelectItem key={c.value} value={c.value} className="font-mono">
-                    {c.label}
-                  </SelectItem>
-                ))}
+                {COMMANDS.map((c) => {
+                  const cap = caps?.capabilities?.[c.value]
+                  const blocked = cap ? !cap.supported : false
+                  return (
+                    <SelectItem
+                      key={c.value}
+                      value={c.value}
+                      disabled={blocked}
+                      className="font-mono"
+                    >
+                      <span className="flex items-center gap-1.5">
+                        {blocked ? (
+                          <Ban className="w-3 h-3 text-cyber-text-muted flex-shrink-0" />
+                        ) : (
+                          cap && (
+                            <CheckCircle2 className="w-3 h-3 text-cyber-neon-green flex-shrink-0" />
+                          )
+                        )}
+                        {c.label}
+                      </span>
+                    </SelectItem>
+                  )
+                })}
               </SelectContent>
             </Select>
             <p className="text-xs text-cyber-text-muted font-mono">{active.desc}</p>
+            {/* Lý do dữ liệu không đỡ được / ghi chú thêm khi đỡ được */}
+            {activeBlocked && (
+              <div className="rounded-md border border-cyber-neon-pink/40 bg-cyber-neon-pink/10 px-2.5 py-2">
+                <p className="text-xs font-mono text-cyber-neon-pink">
+                  Dữ liệu chưa đủ: {activeCap?.reason}
+                </p>
+              </div>
+            )}
+            {!activeBlocked && activeCap?.reason && (
+              <p className="text-xs font-mono text-cyber-neon-green/80">
+                {activeCap.reason}
+              </p>
+            )}
           </div>
 
           {/* brand_map chỉ cho sov */}
@@ -133,13 +229,18 @@ export function AnalyzeDialog({ file, open, onOpenChange }: AnalyzeDialogProps) 
           {/* Nút chạy */}
           <Button
             onClick={handleRun}
-            disabled={running}
+            disabled={running || activeBlocked}
             className="w-full font-mono"
           >
             {running ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                 Đang phân tích... (có thể mất 10–60 giây)
+              </>
+            ) : activeBlocked ? (
+              <>
+                <Ban className="w-4 h-4 mr-2" />
+                Dữ liệu không đủ cho dashboard này
               </>
             ) : (
               <>

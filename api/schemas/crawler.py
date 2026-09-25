@@ -86,6 +86,9 @@ class CrawlerStatusResponse(BaseModel):
     crawler_type: Optional[str] = None
     started_at: Optional[str] = None
     error_message: Optional[str] = None
+    # Exit code của tiến trình crawl gần nhất (None = chưa chạy / đang chạy).
+    # Cần lộ ra để phía gọi phân biệt "cào xong" với "cào chết".
+    exit_code: Optional[int] = None
 
 
 class LogEntry(BaseModel):

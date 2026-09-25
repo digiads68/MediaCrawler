@@ -238,6 +238,87 @@ CREATOR`) — crawler **không** có chế độ đọc thẳng bảng trending/
 Douyin/Weibo... Mọi "biết cái gì đang hot" phải suy ra từ crawl theo **từ khoá tự chọn** rồi
 chạy `analyzer trend`. Đừng hứa hẹn với người dùng tính năng "lấy hot list" — chưa có.
 
+### 5.11. Dữ liệu xuất ra có dòng TRÙNG → mọi báo cáo cũ phồng số 20–29%
+
+Đo trên chính dữ liệu trong `data/`: `xhs_search_20260724` 40 dòng có **8 trùng
+`note_id`** (20%), `bilibili_search_20260724` 39 dòng có **10 trùng `video_id`** (26%),
+`douyin_search_20260724` 28 dòng có **8 trùng `aweme_id`** (29%).
+
+**Đã xử lý:** `kit/enrich/schema.py: dedupe_posts()` chạy trong `analyzer.load()`, bỏ trùng
+theo `(platform, post_id)` và in `[!] Bỏ N dòng trùng`.
+
+⚠️ **Hệ quả cần biết:** mọi báo cáo sinh TRƯỚC fix này có số cao hơn thực tế. Chạy lại
+analyzer trên cùng file sẽ ra số nhỏ hơn — đó là số đúng, không phải mất dữ liệu.
+Đặc biệt **sound watchlist (CS10) trước đây là ảo**: 8 "nhạc trending" của file Douyin chỉ
+là cùng một bài bị đếm 2 lần; sau dedupe còn 20 bài / 20 nhạc, **không nhạc nào dùng lại**.
+
+### 5.12. Mã nền tảng KHÁC tên thư mục dữ liệu → MCP không thấy file vừa cào
+
+`api/routers/data.py` lọc `?platform=` bằng so khớp chuỗi con của đường dẫn, nhưng thư mục
+là tên đầy đủ: `dy`→`data/douyin/`, `ks`→`data/kuaishou/`, `wb`→`data/weibo/`, và Bilibili
+ghi **hai** thư mục (`data/bilibili/` cho Excel, `data/bili/` cho JSON). Đo thật trước fix:
+`?platform=dy` → **0 file** trong khi `?platform=douyin` → 3 file. Vì MCP luôn gửi mã ngắn,
+`crawl_search` trên Douyin/Kuaishou/Weibo **luôn** báo *"chưa thấy file kết quả"* dù cào xong.
+
+**Đã xử lý:** bảng `PLATFORM_DIRS` + `dirs_for()` trong `kit/enrich/schema.py` là nguồn sự
+thật duy nhất; `api/routers/data.py` và `kit/queue/tasks.py` khớp theo **tên thư mục**.
+
+### 5.13. Crawl thất bại vẫn báo `idle` → phía gọi dùng dữ liệu của lần trước
+
+`crawler_manager` trước đây set `status="idle"` bất kể exit code và `get_status()` hardcode
+`error_message=None`. Hệ quả: MCP/job coi crawl chết là xong rồi đi lấy **file cũ**.
+
+**Đã xử lý:** lưu `exit_code`; exit ≠ 0 → `status="error"` + `error_message` kèm 3 dòng log
+lỗi cuối; `CrawlerStatusResponse` lộ thêm `exit_code`.
+
+### 5.14. `.jsonl` vô hình với API dữ liệu — mà đó là `save_option` mặc định
+
+`api/routers/data.py` thiếu `.jsonl` trong `supported_extensions` và không có nhánh preview,
+trong khi `CrawlerStartRequest.save_option` và MCP `crawl_detail` **mặc định là `jsonl`**
+→ luồng detail gần như luôn "không thấy file". **Đã xử lý:** thêm đuôi + nhánh preview đọc
+từng dòng JSON.
+
+### 5.15. `trend_radar` crash trên Bilibili/Weibo + `eng_total` hụt
+
+Hai lỗi cùng gốc là tên cột chỉ số khác nhau giữa các nền tảng:
+- `trend_radar` agg cứng vào `collected_count` → **KeyError, crash hoàn toàn** trên Bilibili
+  và Weibo (2 nền tảng không có cột đó).
+- `COUNT_COLS` thiếu tên cột Bilibili/Weibo/Zhihu → 1 bài Bilibili có like 472K + favorite
+  744K + comment 320K + share 91K mà `eng_total` chỉ ra **472K**, `save_rate`/`share_rate` = 0.
+
+**Đã xử lý:** `kit/enrich/schema.py` map cột về canonical `m_like/m_comment/m_share/m_save/
+m_view` (chỉ THÊM cột, không đổi cột gốc); `add_engagement` ưu tiên `m_*` và **có fallback**
+về logic cũ; `save_tb` suy cột theo nền tảng. Sau fix `eng_total` = **1.628.745**.
+Cột thiếu để **NaN, không điền 0** — Kuaishou không có comment/share, điền 0 sẽ dìm nó khi
+so sánh chéo nền tảng.
+
+### 5.16. Báo cáo XHS không hiện ảnh nào
+
+`_media_grid` chỉ đọc `cover_url`, nhưng XHS **không có** cột đó (cover là ảnh đầu trong
+`image_list`), Bilibili/Kuaishou lại dùng `video_cover_url`. **Đã xử lý:** dùng
+`schema.cover_of_row()`. Đã kiểm: báo cáo XHS từ 0 → 20 ảnh. Ảnh cover load được **không
+cần Referer** (đo: `200 image/jpeg`) nên hotlink trực tiếp, không cần proxy.
+
+### 5.17. `FORMAT_RULES` quá yếu → phân loại format gần như vô dụng
+
+Đo trước khi sửa, tỉ lệ bài rơi vào "khác": **xhs 85% · douyin 75% · bilibili 56%**. Nguyên
+nhân kép: quá ít từ khoá, và khớp theo thứ tự chèn dict nên một từ khoá yếu chiếm luôn nhãn.
+
+**Đã xử lý:** đổi sang **chấm điểm** (số luật khớp được, hoà thì theo `_FORMAT_PRIORITY`) +
+mở rộng từ khoá tiếng Trung/Việt + thêm 6 nhóm (`case/战绩`, `warning/劝退`, `resource/干货`,
+`recruit/招募`, `qna/问答`, `series/合辑`). Sau sửa: **xhs 9.4% · douyin 20% · bilibili 3.4%**.
+`tests/test_format_rules.py` ghim ngưỡng ≤40% thành ràng buộc CI và ghim nhãn cũ khỏi hồi quy.
+⚠️ `list/top` **cố ý không nhận `步`** (bước) và chỉ nhận chữ số ASCII — nếu không,
+`"教你三步护肤教程"` sẽ ra `list/top` thay vì `tutorial`.
+
+### 5.18. Tên báo cáo cố định → chạy 2 nền tảng là ghi đè nhau
+
+`build_report` luôn ghi `reports/{command}_report.html`, nên chạy `trend` cho Douyin rồi cho
+XHS là **mất báo cáo đầu**. **Đã xử lý:** thêm tham số `slug` (mặc định rỗng → giữ nguyên tên
+cũ cho tương thích); `_run_analyzer` sinh slug từ nền tảng + từ khoá. Ngoài ra `reports/` giờ
+suy từ `Path(__file__)` chứ không phải CWD — trước đây chạy uvicorn từ thư mục khác thì báo
+cáo ghi ra chỗ `api/routers/kit.py` không đọc tới.
+
 ## 6. Việc CHƯA làm — gợi ý lộ trình tiếp theo
 
 Sắp theo độ ưu tiên (dựa trên giá trị/công sức), không phải thứ tự bắt buộc:

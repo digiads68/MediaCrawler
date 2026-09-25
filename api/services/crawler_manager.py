@@ -39,6 +39,12 @@ class CrawlerManager:
         self._log_id = 0
         self._logs: List[LogEntry] = []
         self._read_task: Optional[asyncio.Task] = None
+        # Kết quả lần chạy gần nhất. Cần lưu lại vì trước đây tiến trình crawl
+        # thất bại (exit code != 0) vẫn để status="idle" và error_message=None,
+        # nên phía gọi (MCP/job) tưởng là thành công rồi đi lấy file của lần cào
+        # TRƯỚC đó mà không hề biết.
+        self._exit_code: Optional[int] = None
+        self._error_message: Optional[str] = None
         # Project root directory
         self._project_root = Path(__file__).parent.parent.parent
         # Log queue - for pushing to WebSocket
@@ -99,6 +105,9 @@ class CrawlerManager:
             # Clear old logs
             self._logs = []
             self._log_id = 0
+            # Xoá kết quả lần trước để không báo lỗi cũ cho lần chạy mới
+            self._exit_code = None
+            self._error_message = None
 
             # Clear pending queue (don't replace object to avoid WebSocket broadcast coroutine holding old queue reference)
             if self._log_queue is None:
@@ -127,7 +136,7 @@ class CrawlerManager:
                     encoding='utf-8',
                     bufsize=1,
                     cwd=str(self._project_root),
-                    env={**os.environ, "PYTHONUNBUFFERED": "1"}
+                    env={**os.environ, "PYTHONUNBUFFERED": "1", "PYTHONUTF8": "1"}
                 )
 
                 self.status = "running"
@@ -199,7 +208,10 @@ class CrawlerManager:
             "platform": self.current_config.platform.value if self.current_config else None,
             "crawler_type": self.current_config.crawler_type.value if self.current_config else None,
             "started_at": self.started_at.isoformat() if self.started_at else None,
-            "error_message": None
+            # Báo lỗi THẬT thay vì luôn None — phía gọi (MCP/job) cần phân biệt
+            # được "cào xong" với "cào chết" để không dùng dữ liệu của lần trước.
+            "error_message": self._error_message,
+            "exit_code": self._exit_code,
         }
 
     def _build_command(self, config: CrawlerStartRequest) -> list:
@@ -271,12 +283,25 @@ class CrawlerManager:
             # Process ended
             if self.status == "running":
                 exit_code = self.process.returncode if self.process else -1
+                self._exit_code = exit_code
                 if exit_code == 0:
                     entry = self._create_log_entry("Crawler completed successfully", "success")
+                    await self._push_log(entry)
+                    self.status = "idle"
                 else:
-                    entry = self._create_log_entry(f"Crawler exited with code: {exit_code}", "warning")
-                await self._push_log(entry)
-                self.status = "idle"
+                    # Trước đây vẫn set "idle" ở đây, nên crawl chết mà phía gọi
+                    # tưởng thành công rồi lấy file của lần cào trước. Giờ báo
+                    # "error" + kèm mấy dòng log lỗi cuối để chẩn đoán.
+                    tail = [e.message for e in self._logs[-40:]
+                            if e.level == "error"][-3:]
+                    self._error_message = (
+                        f"Crawler kết thúc với exit code {exit_code}."
+                        + (" Lỗi cuối: " + " | ".join(tail) if tail else "")
+                    )
+                    entry = self._create_log_entry(
+                        f"Crawler exited with code: {exit_code}", "error")
+                    await self._push_log(entry)
+                    self.status = "error"
 
         except asyncio.CancelledError:
             pass

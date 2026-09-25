@@ -9,7 +9,6 @@
 3. 仓库 grep 断言 —— store/ 与 media_platform/ 不再把禁用字段作为存储 dict 的 key。
 """
 import re
-import subprocess
 import pathlib
 
 import pytest
@@ -213,26 +212,42 @@ def test_bilibili_video_dict_masks_user_info():
 
 # ----------------------------- 仓库 grep 断言 -----------------------------
 
+def _grep_store(pattern: str) -> str:
+    """
+    在 store/ 的 .py 文件里搜正则，命中行以 `相对路径:行号:内容` 形式返回。
+
+    这里用纯 Python 而不是外部 grep：Windows 上 Python 会把参数列表拼成命令行，
+    而 Git 自带的 grep.EXE(MSYS) 会再解析一次，含引号的正则会被拆坏，导致路径参数
+    丢失；GNU grep 在 -r 且无有效路径时改为递归当前目录，于是扫进 .venv/.git 的
+    二进制文件，既跑偏又让解码崩掉。纯 Python 没有这层引号/路径歧义，跨平台一致。
+    """
+    rx = re.compile(pattern)
+    hits: list[str] = []
+    store_dir = ROOT / "store"
+    for path in sorted(store_dir.rglob("*.py")):
+        text = path.read_text(encoding="utf-8", errors="replace")
+        for lineno, line in enumerate(text.splitlines(), 1):
+            if rx.search(line):
+                rel = path.relative_to(ROOT).as_posix()
+                hits.append(f"{rel}:{lineno}:{line.strip()}")
+    return "\n".join(hits)
+
+
 def test_store_no_forbidden_dict_keys():
     # store/ 下不得把禁用字段作为存储 dict 的 key("field": value 形式)
-    out = subprocess.run(
-        ["grep", "-rnE", '"(' + "|".join(FORBIDDEN_KEYS) + r')"\s*:', str(ROOT / "store")],
-        capture_output=True, text=True,
-    )
+    hits = _grep_store('"(' + "|".join(FORBIDDEN_KEYS) + r')"\s*:')
     # 允许的例外：Mongo store_creator 里的 query={"user_id": ...} 已全部改为 pass，应为空
-    assert out.stdout.strip() == "", f"store/ 仍写入禁用字段键:\n{out.stdout}"
+    assert hits == "", f"store/ 仍写入禁用字段键:\n{hits}"
 
 
 def test_store_no_creator_orm_imports():
     # 已删除的 creator ORM 表(XhsCreator/DyCreator/...)不得再从 database.models 导入。
     # 注意:model/m_*.py 里的同名 pydantic 类是内存类型，允许保留。
-    out = subprocess.run(
-        ["grep", "-rnE",
-         r"from database\.models import.*(XhsCreator|DyCreator|WeiboCreator|TiebaCreator|ZhihuCreator|BilibiliUpInfo|BilibiliContactInfo)",
-         str(ROOT / "store")],
-        capture_output=True, text=True,
-    )
-    assert out.stdout.strip() == "", f"store/ 仍 import 已删除的 creator ORM 表:\n{out.stdout}"
+    hits = _grep_store(
+        r"from database\.models import.*"
+        r"(XhsCreator|DyCreator|WeiboCreator|TiebaCreator|ZhihuCreator"
+        r"|BilibiliUpInfo|BilibiliContactInfo)")
+    assert hits == "", f"store/ 仍 import 已删除的 creator ORM 表:\n{hits}"
 
 
 if __name__ == "__main__":

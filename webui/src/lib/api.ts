@@ -110,10 +110,31 @@ export interface KitAnalyzeResult {
   reports: string[]
 }
 
+// Dashboard nào chạy được với file dữ liệu này (chấm từ dữ liệu thực có trong file)
+export interface KitCapability {
+  supported: boolean
+  reason: string
+}
+
+export interface KitCapabilitiesResult {
+  file: string
+  rows: number
+  kind: 'posts' | 'comments'
+  columns: string[]
+  capabilities: Record<KitCommand, KitCapability>
+}
+
 export const kitApi = {
   // /kit mount ở GỐC (không prefix /api) -> override baseURL='' để không thành /api/kit
   analyze: (req: KitAnalyzeRequest) =>
     api.post<KitAnalyzeResult>('/kit/analyze', req, { baseURL: '', timeout: 300000 }),
+  // Soi file -> dashboard khả dụng (WebUI chỉ bật những cái dữ liệu đỡ được)
+  capabilities: (file: string) =>
+    api.get<KitCapabilitiesResult>('/kit/analyze/capabilities', {
+      baseURL: '',
+      params: { file },
+      timeout: 120000,
+    }),
   // URL báo cáo (mở tab mới / tải) — cũng ở gốc /kit
   reportUrl: (name: string) => `/kit/reports/${encodeURIComponent(name)}`,
 }
