@@ -249,7 +249,7 @@ Làm theo đúng khung đợt 1 (3 tầng, token màu, `_media_grid`/`_table` đ
 | `6c032b8` | Đồng bộ upstream đến `380b426` (merge, cha thứ 2 = `upstream/main`) + `start.bat` |
 | `d898424` | Thay đổi local có từ trước phiên (schema canonical, registry, media_urls, crawler_manager exit_code…) |
 | `a523d35` | Đổi cổng MCP 8765 → 8790 |
-| (commit cuối phiên) | Crawler Douyin + goto chịu lỗi + report đợt 1 + sửa lỗi dữ liệu + tài liệu bàn giao |
+| `5fd4d26` | Crawler Douyin + goto chịu lỗi + report đợt 1 + sửa lỗi dữ liệu + tài liệu bàn giao |
 
 ## 9. Kiểm lại nhanh
 

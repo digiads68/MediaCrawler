@@ -63,7 +63,7 @@ qua 2 PR:
 | `6c032b8` | Đồng bộ upstream NanmiCoder `e6e863a` → `380b426`; merge có cha thứ 2 `upstream/main` (lần sau chỉ cần `git merge upstream/main`) |
 | `d898424` | Các thay đổi local trước phiên: `kit/enrich/schema.py`, `analyzer/registry.py`, `capabilities.py`, `media_urls.py`, `crawler_manager` báo `exit_code` |
 | `a523d35` | Cổng MCP HTTP 8765 → 8790 (tránh exllm bridge của vidauto) |
-| commit cuối phiên | Phân trang tìm kiếm Douyin, chặn từ khoá rỗng, `tools/page_nav.py`, `start.bat` chống chạy trùng, **report đợt 1** (`kit/analyzer/insights.py`, Trend Radar 3 tầng, đủ dữ liệu, ô nhận xét), sửa lỗi JSON mất ngày + bình luận mất 90% |
+| `5fd4d26` | Phân trang tìm kiếm Douyin, chặn từ khoá rỗng, `tools/page_nav.py`, `start.bat` chống chạy trùng, **report đợt 1** (`kit/analyzer/insights.py`, Trend Radar 3 tầng, đủ dữ liệu, ô nhận xét), sửa lỗi JSON mất ngày + bình luận mất 90% |
 
 **Chưa qua tay session này (từ zip gốc, chưa kiểm chứng):** `kit/mcp/mcp_mediacrawler.py`,
 `kit/n8n/*.json` (nội dung workflow đã review khi viết docs, nhưng chưa import/test thật
