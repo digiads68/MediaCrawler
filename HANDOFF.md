@@ -96,8 +96,9 @@ là **vô hại** — đó là nhánh cho tính năng debug mới của Chrome 1
 ## 3. Launcher & cổng
 
 ### 3.1. `start.bat`
-- Build lại WebUI khi mã nguồn `webui/` mới hơn `api/webui/index.html` (trước chỉ build lần đầu →
-  giao diện mới không bao giờ hiện).
+- Build lại WebUI khi **một trong hai**: commit git lệch với `api/webui/.build-commit` (bắt trường hợp
+  OneDrive giữ bản build cũ — commit `7099623` làm ở máy khác), **hoặc** file trong `webui/src` mới hơn
+  bản build (bắt sửa giao diện chưa commit). Đã chạy thử 4 tình huống trong `cmd`.
 - Kiểm tra `ffmpeg` (tuỳ chọn, chỉ cảnh báo): bộ tải media mới dùng để ghép DASH Bilibili.
 - **Phát hiện chạy trùng:** cổng 8080 đã có MediaCrawler → báo "ĐÃ CHẠY", mở WebUI, thoát;
   app khác giữ 8080 → in tên + PID. Trước đây chạy `start.bat` lần 2 → uvicorn lỗi
@@ -249,6 +250,7 @@ Làm theo đúng khung đợt 1 (3 tầng, token màu, `_media_grid`/`_table` đ
 | `6c032b8` | Đồng bộ upstream đến `380b426` (merge, cha thứ 2 = `upstream/main`) + `start.bat` |
 | `d898424` | Thay đổi local có từ trước phiên (schema canonical, registry, media_urls, crawler_manager exit_code…) |
 | `a523d35` | Đổi cổng MCP 8765 → 8790 |
+| (merge) | Gộp `7099623` từ GitHub (start.bat kiểm tra build theo commit, làm ở máy khác 22/07) |
 | `5fd4d26` | Crawler Douyin + goto chịu lỗi + report đợt 1 + sửa lỗi dữ liệu + tài liệu bàn giao |
 
 ## 9. Kiểm lại nhanh

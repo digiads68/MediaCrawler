@@ -129,22 +129,35 @@ set UV_PYTHON_DOWNLOADS=never
 set UV_NO_SYNC=1
 
 REM ---------------------------------------------------------------
-REM 5. Build WebUI (chua build, HOAC ma nguon webui moi hon ban build -
-REM    vd. vua cap nhat tu upstream / sua giao dien kit)
+REM 5. Build WebUI khi: chua build, HOAC ban build khong khop commit hien tai,
+REM    HOAC ma nguon webui vua sua (chua commit) moi hon ban build.
+REM    QUAN TRONG: api\webui\ khong nam trong git (.gitignore). Neu thu muc
+REM    du an dat trong OneDrive/Dropbox... va cung ten thu muc da ton tai tu
+REM    truoc (vd may khac cung tai khoan da dong bo len may nay), OneDrive
+REM    co the giu lai ban build CU (khong bi git dong lai vi khong theo doi)
+REM    du code moi da git pull/clone ve - webui hien thi thieu chuc nang moi
+REM    ma khong bao loi gi. Vi vay: (1) so commit git hien tai voi dau vet
+REM    luu tu lan build truoc; (2) so thoi gian sua file ma nguon voi ban build
+REM    (bat duoc ca sua giao dien chua commit). KHONG chi kiem tra file co ton tai.
 REM ---------------------------------------------------------------
-if not exist "api\webui\index.html" goto :webui_build
+set WEBUI_HASH_FILE=api\webui\.build-commit
+for /f "delims=" %%h in ('git rev-parse HEAD 2^>nul') do set GIT_HEAD=%%h
+if "%GIT_HEAD%"=="" set GIT_HEAD=nogit
+
+set NEED_WEBUI_BUILD=0
+if not exist "api\webui\index.html" set NEED_WEBUI_BUILD=1
+if not exist "%WEBUI_HASH_FILE%" set NEED_WEBUI_BUILD=1
+if exist "%WEBUI_HASH_FILE%" (
+    set /p OLD_WEBUI_HASH=<"%WEBUI_HASH_FILE%"
+    if not "!OLD_WEBUI_HASH!"=="!GIT_HEAD!" set NEED_WEBUI_BUILD=1
+)
+if "%NEED_WEBUI_BUILD%"=="1" goto :webui_run
 "%VENV_PY%" -c "import pathlib,sys; b=pathlib.Path('api/webui/index.html').stat().st_mtime; w=pathlib.Path('webui'); fs=[f for f in w.joinpath('src').rglob('*') if f.is_file()]+[w/n for n in ('index.html','package.json','vite.config.ts') if (w/n).exists()]; sys.exit(1 if any(f.stat().st_mtime>b for f in fs) else 0)"
-if errorlevel 1 goto :webui_rebuild
+if errorlevel 1 goto :webui_run
 goto :webui_ready
 
-:webui_rebuild
-echo [4/7] Ma nguon WebUI moi hon ban build - build lai...
-goto :webui_run
-
-:webui_build
-echo [4/7] Build WebUI (lan dau, can vai chuc giay)...
-
 :webui_run
+echo [4/7] Build WebUI (chua build, code moi hon ban build cu, hoac vua sua giao dien - vai chuc giay)...
 where npm >nul 2>nul
 if errorlevel 1 goto :webui_no_npm
 pushd webui
@@ -153,6 +166,7 @@ if errorlevel 1 goto :webui_build_failed
 call npm run build
 if errorlevel 1 goto :webui_build_failed
 popd
+> "%WEBUI_HASH_FILE%" echo %GIT_HEAD%
 goto :webui_done
 
 :webui_build_failed
@@ -166,7 +180,7 @@ echo            Cai Node 18+ tu https://nodejs.org roi chay lai file nay neu can
 goto :webui_done
 
 :webui_ready
-echo [4/7] WebUI - da build, bo qua.
+echo [4/7] WebUI - da build, khop code hien tai (commit !GIT_HEAD:~0,7!), bo qua.
 
 :webui_done
 
