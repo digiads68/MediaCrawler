@@ -1,5 +1,23 @@
 # CHANGELOG
 
+## Đồng bộ upstream — 2026-09-25
+
+Cập nhật base crawler từ [NanmiCoder/MediaCrawler](https://github.com/NanmiCoder/MediaCrawler)
+`e6e863a` (2026-07-25) → `380b426` (2026-09-19). Code `kit/` không đổi.
+
+- **Tải media viết lại** (`media_downloader/`, `media_platform/*/media.py`) cho
+  xhs/dy/ks/bili/wb; bỏ các `store/*/*_store_media.py` cũ. Cờ CLI mới `--get_media`.
+  Bilibili tải DASH chất lượng cao nếu máy có **ffmpeg** (không có thì tự hạ mp4).
+- Fix: dy (header `x-tt-argus`, tham số `uifid/verifyFp`), ks (link rút gọn `/f/<token>`,
+  video bị gỡ làm crash, giới hạn tần suất), bili (xác định đăng nhập, bình luận ghim),
+  xhs (phân loại lỗi, video chỉ tải được ảnh bìa), weibo (lệch múi giờ 8 tiếng).
+- `xhshow>=0.2.0` — bỏ monkey-patch ký GET (trùng bản vá local trước đó).
+- Giữ các sửa local: `download_url` của Bilibili (nay xin `MP4_FNVAL` vì mặc định
+  mới là DASH, không có `durl`), `exit_code`/`error_message` của CrawlerManager,
+  `XHS_INTERNATIONAL=True`.
+- `start.bat`: build lại WebUI khi mã nguồn `webui/` mới hơn bản build; kiểm tra ffmpeg
+  (chỉ cảnh báo, không tự cài).
+
 ## v2.0.0 — 2026-07-19 · DigiAds Kit
 
 Bản v2 tích hợp **DigiAds Kit** biến MediaCrawler thành cỗ máy nghiên cứu sáng tạo

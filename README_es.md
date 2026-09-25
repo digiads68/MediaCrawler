@@ -2,16 +2,16 @@
 
 <div align="center">
 
-### 🤝 Agradecimientos Especiales a Nuestro Patrocinador Platino
+### 🤝 Agradecimientos Especiales a Nuestro Patrocinador Oro
 
-<a href="https://www.browseract.com/?co-from=mediacrawler&redirect=https://github.com/browser-act/skills/tree/main" target="_blank">
-  <img src="docs/static/images/browseract.png" alt="BrowserAct" width="400">
+<a href="https://www.browseract.ai/mediacrawler" target="_blank">
+  <img src="docs/static/images/browseract_ad.jpg" alt="BrowserAct" width="600">
 </a>
 
 <br>
 
-<a href="https://www.browseract.com/?co-from=mediacrawler&redirect=https://github.com/browser-act/skills/tree/main" target="_blank">
-<small>BrowserAct es una herramienta de automatización de navegador diseñada para Agentes de IA, con manejo de intercepciones anti-bot, transferencia humana cuando las tareas se atascan, aislamiento paralelo de múltiples tareas y gestión independiente de múltiples cuentas, ayudando a los Agentes a completar tareas web reales de manera más estable.</small>
+<a href="https://www.browseract.ai/mediacrawler" target="_blank">
+<small>BrowserAct permite extraer datos de cualquier sitio web con una sola frase. Sin código: créalo una vez, reutilízalo de forma estable y consume muy pocos tokens. BrowserAct utiliza un navegador real para crear automáticamente Bots de recolección de datos, con navegación sigilosa, gestión de CAPTCHA y proxies residenciales integrados, y entrega directamente resultados estructurados. Pruébalo gratis ahora.</small>
 </a>
 
 </div>
@@ -296,18 +296,10 @@ MediaCrawler soporta múltiples métodos de almacenamiento de datos, incluyendo 
     </tr>
     <tr>
       <td align="center" valign="middle">
-        <a href="https://bloome.im/app?ref=NanmiCoder&utm_medium=github&utm_source=NanmiCoder-MediaCrawler-ivor-202607"><img src="docs/static/images/bloome_logo.png" width="180" alt="Bloome"></a>
+        <a href="https://go.nodemaven.com/MediaCrawlerSeptember"><img src="docs/static/images/nodemaven_banner_sep.png" width="180" alt="NodeMaven"></a>
       </td>
       <td valign="middle">
-        <a href="https://bloome.im/app?ref=NanmiCoder&utm_medium=github&utm_source=NanmiCoder-MediaCrawler-ivor-202607">Bloome</a> es una plataforma de IM de agentes de IA: varios agentes de IA (Claude, ChatGPT, DeepSeek, etc.) colaboran contigo en una misma conversación como miembros de un equipo, dividiéndose el trabajo automáticamente y revisándose entre sí, y generando directamente tablas, documentos y paneles visuales. Sin configuración, funciona en la nube, disponible tanto en web como en móvil, y puedes compartir tus agentes configurados con tu equipo con un solo clic. 👉 <a href="https://bloome.im/app?ref=NanmiCoder&utm_medium=github&utm_source=NanmiCoder-MediaCrawler-ivor-202607">Prueba Bloome</a>
-      </td>
-    </tr>
-    <tr>
-      <td align="center" valign="middle">
-        <a href="https://go.nodemaven.com/MediaCrawler"><img src="docs/static/images/nodemaven_logo.svg" width="180" alt="NodeMaven"></a>
-      </td>
-      <td valign="middle">
-        <a href="https://go.nodemaven.com/MediaCrawler">NodeMaven</a> ofrece proxies fiables y de alta calidad para automatización, web scraping, investigación SEO y gestión de redes sociales. El servicio incluye una disponibilidad del 99,9%, sesiones persistentes de hasta 7 días, filtrado de IP en todos los proxies (puntuación de fraude inferior al 97%), sin KYC y reembolso de hasta el 10% del tráfico. Los usuarios de MediaCrawler obtienen un 35% de descuento en proxies móviles y residenciales con el código <code>CRAWLER35</code>, y un 40% de descuento en proxies ISP (estáticos) con <code>CRAWLER40</code>. 👉 <a href="https://go.nodemaven.com/MediaCrawler">Visita NodeMaven</a>
+        <a href="https://go.nodemaven.com/MediaCrawlerSeptember">NodeMaven</a> es un proveedor eficiente de proxies para web scraping y automatización, con las IP de mayor calidad del mercado. Sus principales ventajas incluyen una disponibilidad del 99,9%, segmentación por código postal, filtrado de IP en todos los proxies (puntuación de fraude inferior al 97%), sin KYC y herramientas gratuitas exclusivas como Proxy Bandwidth Checker, Meta Tag Checker, IP Lookup y más. Los usuarios de MediaCrawler obtienen un 35% de descuento en proxies móviles y residenciales con el código <code>CRAWLER35</code>, y un 40% de descuento en proxies ISP (estáticos) con el código <code>CRAWLER40</code>. 👉 <a href="https://go.nodemaven.com/MediaCrawlerSeptember">Visita NodeMaven</a>
       </td>
     </tr>
   </tbody>
@@ -334,7 +326,7 @@ MediaCrawler soporta múltiples métodos de almacenamiento de datos, incluyendo 
 
 ¡Si este proyecto te ayuda, por favor da una ⭐ Estrella para apoyar y que más personas vean MediaCrawler!
 
-[![Star History Chart](https://api.star-history.com/svg?repos=NanmiCoder/MediaCrawler&type=Date)](https://star-history.com/#NanmiCoder/MediaCrawler&Date)
+[![Star History Chart](https://www.repostars.dev/api/embed?repo=NanmiCoder%2FMediaCrawler&theme=ocean)](https://www.repostars.dev/?repos=NanmiCoder%2FMediaCrawler&theme=ocean)
 
 
 ## 📚 Referencias

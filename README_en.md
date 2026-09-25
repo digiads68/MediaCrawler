@@ -2,16 +2,16 @@
 
 <div align="center">
 
-### 🤝 Special Thanks to Our Platinum Sponsor
+### 🤝 Special Thanks to Our Gold Sponsor
 
-<a href="https://www.browseract.com/?co-from=mediacrawler&redirect=https://github.com/browser-act/skills/tree/main" target="_blank">
-  <img src="docs/static/images/browseract.png" alt="BrowserAct" width="400">
+<a href="https://www.browseract.ai/mediacrawler" target="_blank">
+  <img src="docs/static/images/browseract_ad.jpg" alt="BrowserAct" width="600">
 </a>
 
 <br>
 
-<a href="https://www.browseract.com/?co-from=mediacrawler&redirect=https://github.com/browser-act/skills/tree/main" target="_blank">
-<small>BrowserAct is a browser automation tool designed for AI Agents, featuring anti-bot interception handling, human handoff when tasks get stuck, multi-task parallel isolation, and multi-account independent management, helping Agents complete real-world web tasks more reliably.</small>
+<a href="https://www.browseract.ai/mediacrawler" target="_blank">
+<small>BrowserAct lets you extract data from any website with a single sentence. No code required—build once, reuse reliably, and consume very few tokens. BrowserAct uses a real browser to automatically build data collection Bots, with built-in stealth browsing, CAPTCHA handling, and residential proxies, then outputs structured results directly. Try it free now.</small>
 </a>
 
 </div>
@@ -304,18 +304,10 @@ MediaCrawler supports multiple data storage methods, including CSV, JSON, JSONL,
     </tr>
     <tr>
       <td align="center" valign="middle">
-        <a href="https://bloome.im/app?ref=NanmiCoder&utm_medium=github&utm_source=NanmiCoder-MediaCrawler-ivor-202607"><img src="docs/static/images/bloome_logo.png" width="180" alt="Bloome"></a>
+        <a href="https://go.nodemaven.com/MediaCrawlerSeptember"><img src="docs/static/images/nodemaven_banner_sep.png" width="180" alt="NodeMaven"></a>
       </td>
       <td valign="middle">
-        <a href="https://bloome.im/app?ref=NanmiCoder&utm_medium=github&utm_source=NanmiCoder-MediaCrawler-ivor-202607">Bloome</a> is an AI Agent IM platform — multiple AI agents (Claude, ChatGPT, DeepSeek, etc.) collaborate with you in a single conversation like team members, automatically dividing up the work and cross-checking each other, and directly producing tables, documents, and visual dashboards. Zero config, runs in the cloud, works on both web and mobile, and you can share your configured agents with your team in one click. 👉 <a href="https://bloome.im/app?ref=NanmiCoder&utm_medium=github&utm_source=NanmiCoder-MediaCrawler-ivor-202607">Try Bloome</a>
-      </td>
-    </tr>
-    <tr>
-      <td align="center" valign="middle">
-        <a href="https://go.nodemaven.com/MediaCrawler"><img src="docs/static/images/nodemaven_logo.svg" width="180" alt="NodeMaven"></a>
-      </td>
-      <td valign="middle">
-        <a href="https://go.nodemaven.com/MediaCrawler">NodeMaven</a> provides reliable, high-quality proxies for automation, web scraping, SEO research, and social media management. Features include 99.9% uptime, sticky sessions up to 7 days, IP filtering across all proxies (fraud score below 97%), no KYC, and traffic cashback of up to 10%. MediaCrawler users get 35% off mobile and residential proxies with code <code>CRAWLER35</code>, and 40% off ISP (static) proxies with code <code>CRAWLER40</code>. 👉 <a href="https://go.nodemaven.com/MediaCrawler">Visit NodeMaven</a>
+        <a href="https://go.nodemaven.com/MediaCrawlerSeptember">NodeMaven</a> is an efficient proxy provider for web scraping and automation, offering the highest-quality IPs on the market. Key benefits include 99.9% uptime, ZIP targeting, IP filtering across all proxies (fraud score below 97%), no KYC, and unique free tools such as Proxy Bandwidth Checker, Meta Tag Checker, IP Lookup, and more. MediaCrawler users get 35% off mobile and residential proxies with code <code>CRAWLER35</code>, and 40% off ISP (static) proxies with code <code>CRAWLER40</code>. 👉 <a href="https://go.nodemaven.com/MediaCrawlerSeptember">Visit NodeMaven</a>
       </td>
     </tr>
   </tbody>
@@ -342,7 +334,7 @@ Become a sponsor and showcase your product here, getting massive exposure daily!
 
 If this project helps you, please give a ⭐ Star to support and let more people see MediaCrawler!
 
-[![Star History Chart](https://api.star-history.com/svg?repos=NanmiCoder/MediaCrawler&type=Date)](https://star-history.com/#NanmiCoder/MediaCrawler&Date)
+[![Star History Chart](https://www.repostars.dev/api/embed?repo=NanmiCoder%2FMediaCrawler&theme=ocean)](https://www.repostars.dev/?repos=NanmiCoder%2FMediaCrawler&theme=ocean)
 
 
 ## 📚 References

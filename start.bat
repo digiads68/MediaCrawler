@@ -33,16 +33,16 @@ REM ---------------------------------------------------------------
 if not exist ".venv\Scripts\python.exe" goto :venv_create
 ".venv\Scripts\python.exe" -c "import sys" >nul 2>nul
 if errorlevel 1 goto :venv_broken
-echo [1/6] Virtual environment - OK.
+echo [1/7] Virtual environment - OK.
 goto :venv_done
 
 :venv_broken
-echo [1/6] .venv hong (co the do dong bo tu may khac) - tao lai...
+echo [1/7] .venv hong (co the do dong bo tu may khac) - tao lai...
 rmdir /s /q ".venv" >nul 2>nul
 goto :venv_make
 
 :venv_create
-echo [1/6] Tao virtual environment...
+echo [1/7] Tao virtual environment...
 
 :venv_make
 %PY_CMD% -m venv .venv
@@ -59,7 +59,7 @@ REM ---------------------------------------------------------------
 REM 3. Cai dependencies (requirements.txt + goi cua DigiAds Kit)
 REM    Chay moi lan start - pip tu bo qua goi da du, nen nhanh.
 REM ---------------------------------------------------------------
-echo [2/6] Kiem tra / cai dependencies...
+echo [2/7] Kiem tra / cai dependencies...
 "%VENV_PY%" -m pip install --quiet --upgrade pip
 "%VENV_PY%" -m pip install --quiet -r requirements.txt anthropic supabase arq "mcp[cli]"
 if errorlevel 1 (
@@ -73,11 +73,11 @@ REM 4. Cai uv (crawler_manager.py can lenh uv run de khoi dong crawl thuc te)
 REM ---------------------------------------------------------------
 where uv >nul 2>nul
 if errorlevel 1 goto :install_uv
-echo [3/6] uv - OK.
+echo [3/7] uv - OK.
 goto :uv_done
 
 :install_uv
-echo [3/6] Chua co uv - dang cai qua winget...
+echo [3/7] Chua co uv - dang cai qua winget...
 where winget >nul 2>nul
 if errorlevel 1 goto :check_uv_result
 winget install --id astral-sh.uv --source winget --silent --accept-package-agreements --accept-source-agreements >nul 2>nul
@@ -98,16 +98,35 @@ set UV_PYTHON_DOWNLOADS=never
 set UV_NO_SYNC=1
 
 REM ---------------------------------------------------------------
-REM 5. Build WebUI (neu chua build)
+REM 5. Build WebUI (chua build, HOAC ma nguon webui moi hon ban build -
+REM    vd. vua cap nhat tu upstream / sua giao dien kit)
 REM ---------------------------------------------------------------
-if exist "api\webui\index.html" goto :webui_ready
-echo [4/6] Build WebUI (lan dau, can vai chuc giay)...
+if not exist "api\webui\index.html" goto :webui_build
+"%VENV_PY%" -c "import pathlib,sys; b=pathlib.Path('api/webui/index.html').stat().st_mtime; w=pathlib.Path('webui'); fs=[f for f in w.joinpath('src').rglob('*') if f.is_file()]+[w/n for n in ('index.html','package.json','vite.config.ts') if (w/n).exists()]; sys.exit(1 if any(f.stat().st_mtime>b for f in fs) else 0)"
+if errorlevel 1 goto :webui_rebuild
+goto :webui_ready
+
+:webui_rebuild
+echo [4/7] Ma nguon WebUI moi hon ban build - build lai...
+goto :webui_run
+
+:webui_build
+echo [4/7] Build WebUI (lan dau, can vai chuc giay)...
+
+:webui_run
 where npm >nul 2>nul
 if errorlevel 1 goto :webui_no_npm
 pushd webui
 call npm install
+if errorlevel 1 goto :webui_build_failed
 call npm run build
+if errorlevel 1 goto :webui_build_failed
 popd
+goto :webui_done
+
+:webui_build_failed
+popd
+echo [CANH BAO] Build WebUI that bai - WebUI co the la ban cu. Xem loi npm ben tren.
 goto :webui_done
 
 :webui_no_npm
@@ -116,7 +135,7 @@ echo            Cai Node 18+ tu https://nodejs.org roi chay lai file nay neu can
 goto :webui_done
 
 :webui_ready
-echo [4/6] WebUI - da build, bo qua.
+echo [4/7] WebUI - da build, bo qua.
 
 :webui_done
 
@@ -124,17 +143,33 @@ REM ---------------------------------------------------------------
 REM 6. Tao .env tu .env.example (neu chua co)
 REM ---------------------------------------------------------------
 if exist ".env" goto :env_ready
-echo [5/6] Tao .env tu .env.example - dien API key thuc te vao .env neu dung tinh nang AI/Supabase.
+echo [5/7] Tao .env tu .env.example - dien API key thuc te vao .env neu dung tinh nang AI/Supabase.
 copy /y ".env.example" ".env" >nul
 goto :env_done
 
 :env_ready
-echo [5/6] .env - da co, bo qua.
+echo [5/7] .env - da co, bo qua.
 
 :env_done
 
 REM ---------------------------------------------------------------
-REM 7. Lay dia chi Tailscale (chi de hien thi, khong bat buoc)
+REM 7. ffmpeg (tuy chon) - bo tai media moi cua upstream dung ffmpeg de
+REM    ghep hinh+tieng Bilibili (DASH, chat luong cao). Khong co ffmpeg
+REM    van chay, chi tu ha xuong link mp4 chat luong thap. Khong tu cai.
+REM ---------------------------------------------------------------
+where ffmpeg >nul 2>nul
+if errorlevel 1 goto :no_ffmpeg
+echo [6/7] ffmpeg - OK.
+goto :ffmpeg_done
+
+:no_ffmpeg
+echo [6/7] [TUY CHON] Chua co ffmpeg - tai video Bilibili se o chat luong thap.
+echo       Muon chat luong cao: winget install --id Gyan.FFmpeg  (roi mo lai cua so)
+
+:ffmpeg_done
+
+REM ---------------------------------------------------------------
+REM 8. Lay dia chi Tailscale (chi de hien thi, khong bat buoc)
 REM ---------------------------------------------------------------
 set TS_IP=
 where tailscale >nul 2>nul
@@ -142,7 +177,7 @@ if errorlevel 1 goto :no_tailscale
 for /f "delims=" %%i in ('tailscale ip -4') do set TS_IP=%%i
 
 :no_tailscale
-echo [6/6] Khoi dong server tren cong 8080 (0.0.0.0 - cho phep may khac vao qua Tailscale)...
+echo [7/7] Khoi dong server tren cong 8080 (0.0.0.0 - cho phep may khac vao qua Tailscale)...
 echo.
 echo   Truy cap local     : http://localhost:8080
 if "%TS_IP%"=="" goto :no_ts_ip
