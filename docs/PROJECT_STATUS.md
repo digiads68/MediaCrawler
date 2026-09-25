@@ -202,8 +202,8 @@ lại đúng tài khoản.
   (remote qua Tailscale). Chọn bằng env `MCP_TRANSPORT`/`MCP_HOST`/`MCP_PORT`.
 - **Kết nối Claude Code**: chạy `setup_mcp.bat` → tự dò đường dẫn tuyệt đối máy hiện tại,
   ghi `.mcp.json` (project-scoped, **gitignore** vì đường dẫn theo máy) + in lệnh
-  `claude mcp add`. Remote: `start_mcp.bat` (HTTP 0.0.0.0:8765) rồi máy khác
-  `claude mcp add --transport http mediacrawler http://<tailscale-ip>:8765/mcp`.
+  `claude mcp add`. Remote: `start_mcp.bat` (HTTP 0.0.0.0:8790) rồi máy khác
+  `claude mcp add --transport http mediacrawler http://<tailscale-ip>:8790/mcp`.
   Chi tiết: `kit/mcp/README.md`.
 - **Lỗi đã gặp**: `print()` tiếng Việt ở nhánh HTTP crash cp1252 trên Windows. Đã
   reconfigure stdout UTF-8 **chỉ trong nhánh HTTP** — TUYỆT ĐỐI không đụng stdout ở mode

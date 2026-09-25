@@ -46,9 +46,9 @@ echo     claude mcp add mediacrawler -- "%PY%" "%SCRIPT%"
 echo.
 echo ------------------------------------------------------------
 echo   REMOTE qua Tailscale (may khac ket noi vao may nay):
-echo     1) Tren may nay chay:  start_mcp.bat        (mo HTTP 8765)
+echo     1) Tren may nay chay:  start_mcp.bat        (mo HTTP 8790)
 echo     2) Tren may khac chay:
-echo        claude mcp add --transport http mediacrawler http://[TAILSCALE_IP]:8765/mcp
+echo        claude mcp add --transport http mediacrawler http://[TAILSCALE_IP]:8790/mcp
 echo ------------------------------------------------------------
 echo.
 echo   NHO: MCP goi REST API cong 8080 - phai bat start.bat truoc khi dung.

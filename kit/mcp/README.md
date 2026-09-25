@@ -35,21 +35,21 @@ claude mcp add mediacrawler -- "<ĐƯỜNG_DẪN>\.venv\Scripts\python.exe" "<Đ
 Trên **máy chủ** (máy chạy crawler), sau khi `start.bat` đã bật:
 
 ```bat
-start_mcp.bat            REM mở MCP HTTP tại 0.0.0.0:8765 (đổi cổng: start_mcp.bat "" 9000)
+start_mcp.bat            REM mở MCP HTTP tại 0.0.0.0:8790 (đổi cổng: start_mcp.bat "" 9000)
 ```
 
 Trên **máy khách** (đã cài Tailscale, cùng tailnet):
 
 ```bat
-claude mcp add --transport http mediacrawler http://<TAILSCALE_IP>:8765/mcp
+claude mcp add --transport http mediacrawler http://<TAILSCALE_IP>:8790/mcp
 ```
 
 `<TAILSCALE_IP>` lấy bằng `tailscale ip -4` trên máy chủ (start_mcp.bat cũng tự in ra nếu
-phát hiện Tailscale). Chỉ cần mở cổng **8765** cho máy khách; MCP tự gọi API 8080 nội bộ
+phát hiện Tailscale). Chỉ cần mở cổng **8790** cho máy khách; MCP tự gọi API 8080 nội bộ
 trên máy chủ nên **không cần** phơi cổng 8080 ra ngoài.
 
 > Windows Firewall: nếu máy khách không kết nối được, trên máy chủ mở cổng (Run as Admin):
-> `netsh advfirewall firewall add rule name=MediaCrawlerMCP dir=in action=allow protocol=TCP localport=8765`
+> `netsh advfirewall firewall add rule name=MediaCrawlerMCP dir=in action=allow protocol=TCP localport=8790`
 
 ## 3. Các tool MCP phơi ra
 
@@ -93,6 +93,6 @@ trên máy chủ nên **không cần** phơi cổng 8080 ra ngoài.
 |---|---|---|
 | `MEDIACRAWLER_API` | URL REST backend | `http://127.0.0.1:8080` |
 | `MCP_TRANSPORT` | `stdio` \| `streamable-http` \| `sse` | `stdio` |
-| `MCP_HOST` / `MCP_PORT` | Địa chỉ bind khi chạy HTTP | `127.0.0.1` / `8765` |
+| `MCP_HOST` / `MCP_PORT` | Địa chỉ bind khi chạy HTTP | `127.0.0.1` / `8790` |
 
 Đọc từ `.env` ở gốc dự án (tự nạp). Xem thêm `.env.example`.

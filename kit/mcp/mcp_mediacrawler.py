@@ -14,7 +14,7 @@ Mục đích: bọc một lớp MCP mỏng lên REST API sẵn có của MediaCr
 Chạy độc lập (local, stdio — cho Claude Code/Desktop cùng máy):
     python kit/mcp/mcp_mediacrawler.py
 Chạy remote qua Tailscale (HTTP — cho máy khác kết nối vào):
-    MCP_TRANSPORT=streamable-http MCP_HOST=0.0.0.0 MCP_PORT=8765 python kit/mcp/mcp_mediacrawler.py
+    MCP_TRANSPORT=streamable-http MCP_HOST=0.0.0.0 MCP_PORT=8790 python kit/mcp/mcp_mediacrawler.py
 Cần: pip install "mcp[cli]" httpx python-dotenv
 Yêu cầu: API MediaCrawler đang chạy  ->  uvicorn api.main:app --port 8080
 Tài liệu kết nối chi tiết: kit/mcp/README.md
@@ -45,7 +45,7 @@ DEFAULT_MAX_NOTES = 50         # trần mặc định an toàn, tránh quét n�
 # Transport: 'stdio' (mặc định, local) | 'streamable-http' | 'sse' (remote/Tailscale)
 MCP_TRANSPORT = os.environ.get("MCP_TRANSPORT", "stdio")
 MCP_HOST = os.environ.get("MCP_HOST", "127.0.0.1")
-MCP_PORT = int(os.environ.get("MCP_PORT", "8765"))
+MCP_PORT = int(os.environ.get("MCP_PORT", "8790"))
 
 
 def _detect_public_base() -> str:

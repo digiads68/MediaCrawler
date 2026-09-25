@@ -6,7 +6,7 @@ REM ============================================================
 REM  MCP server MediaCrawler - cho AI agent (Claude Code...) goi
 REM ============================================================
 REM  Cach dung:
-REM    start_mcp.bat          -> che do HTTP cho Tailscale/remote (0.0.0.0:8765)
+REM    start_mcp.bat          -> che do HTTP cho Tailscale/remote (0.0.0.0:8790)
 REM    start_mcp.bat local    -> in huong dan cau hinh stdio (khong can chay nen)
 REM
 REM  LUU Y: MCP goi lai REST API cua MediaCrawler (cong 8080), nen phai
@@ -25,7 +25,8 @@ if /I "%~1"=="local" goto :local_info
 REM --- Che do HTTP (remote qua Tailscale) ---
 set MCP_TRANSPORT=streamable-http
 set MCP_HOST=0.0.0.0
-set MCP_PORT=8765
+REM 8790 (khong dung 8765): 8765/8766/8767... la cua exllm bridge (vidauto) tren may nay
+set MCP_PORT=8790
 if not "%~2"=="" set MCP_PORT=%~2
 
 echo ============================================================
