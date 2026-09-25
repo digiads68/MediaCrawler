@@ -57,6 +57,14 @@ qua 2 PR:
   + 2 dashboard mockup minh hoạ (`docs/dashboard-mockups/`).
 - File này + `AGENTS.md` (đang thêm).
 
+**Phiên 25/09/2026** (chi tiết đầy đủ: [`HANDOFF.md`](../HANDOFF.md)):
+| Commit | Nội dung |
+|---|---|
+| `6c032b8` | Đồng bộ upstream NanmiCoder `e6e863a` → `380b426`; merge có cha thứ 2 `upstream/main` (lần sau chỉ cần `git merge upstream/main`) |
+| `d898424` | Các thay đổi local trước phiên: `kit/enrich/schema.py`, `analyzer/registry.py`, `capabilities.py`, `media_urls.py`, `crawler_manager` báo `exit_code` |
+| `a523d35` | Cổng MCP HTTP 8765 → 8790 (tránh exllm bridge của vidauto) |
+| commit cuối phiên | Phân trang tìm kiếm Douyin, chặn từ khoá rỗng, `tools/page_nav.py`, `start.bat` chống chạy trùng, **report đợt 1** (`kit/analyzer/insights.py`, Trend Radar 3 tầng, đủ dữ liệu, ô nhận xét), sửa lỗi JSON mất ngày + bình luận mất 90% |
+
 **Chưa qua tay session này (từ zip gốc, chưa kiểm chứng):** `kit/mcp/mcp_mediacrawler.py`,
 `kit/n8n/*.json` (nội dung workflow đã review khi viết docs, nhưng chưa import/test thật
 trong n8n), 5 file `kit/templates/*.xlsx`.
@@ -69,7 +77,8 @@ trong n8n), 5 file `kit/templates/*.xlsx`.
 | `kit/enrich` | ✅ | ✅ `test_enrich.py` | Dùng bởi analyzer | `translate_zh_vi` cần `ANTHROPIC_API_KEY` khi provider=claude |
 | `kit/storage` (schema/writer/checkpoint) | ✅ | ✅ `test_storage.py`, `test_checkpoint.py` | Cờ `--to supabase` | Schema **chưa deploy** lên Supabase thật nào — chỉ có SQL sẵn |
 | `kit/pipeline` | ✅ | ✅ `test_pipeline.py` | CLI + `/kit/angle-brief` | provider=claude chưa chạy thật với API key thật trong session này |
-| `kit/report` | ✅ | ✅ `test_report.py` (12 test) | Gọi từ `_run_analyzer`, phục vụ qua `/kit/reports/{name}` | **Mới**: sinh báo cáo HTML tự chứa (donut/hbar/line SVG server-side, link video, palette dataviz đã validate). Đã chạy thật trên data douyin + verify UI end-to-end |
+| `kit/analyzer/insights.py` | ✅ (09/2026) | ✅ `test_insights.py` | Gọi từ `trend_radar` | Kết luận/bằng chứng Trend Radar; luật + ngưỡng ở đầu file |
+| `kit/report` | ✅ (làm lại 09/2026) | ✅ `test_report.py`, `test_report_full_data.py` | Gọi từ `_run_analyzer`, phục vụ qua `/kit/reports/{name}` | **Mới**: sinh báo cáo HTML tự chứa (donut/hbar/line SVG server-side, link video, palette dataviz đã validate). Đã chạy thật trên data douyin + verify UI end-to-end |
 | `kit/webhook` | ✅ | ✅ `test_webhook.py` | Cờ `--notify` | Chưa test với `NOTIFY_WEBHOOK_URL` thật (n8n) |
 | `kit/queue` (arq) | ✅ | ✅ `test_tasks.py` | CLI enqueue + worker | **Chưa chạy thật với Redis** — chỉ test bằng mock |
 | `api/routers/kit.py` | ✅ | ✅ `test_api_kit.py` | Mount trong `api/main.py` | Đã xác nhận hiện đúng trong OpenAPI `/docs` |
@@ -77,7 +86,7 @@ trong n8n), 5 file `kit/templates/*.xlsx`.
 | `kit/mcp/mcp_mediacrawler.py` | ✅ (đã mở rộng) | Smoke test thủ công (import + gọi thật qua REST) | stdio (local) + streamable-http (Tailscale) | **Đã kiểm chứng + nâng cấp**: thêm tool `analyze`/`list_reports`/`read_report`, nạp `.env`, chọn transport qua env. Kèm `setup_mcp.bat` (sinh `.mcp.json` portable), `start_mcp.bat` (HTTP cho Tailscale), `kit/mcp/README.md`. Xem §5.10 |
 | `kit/n8n/*.json` (3 workflow) | Từ zip gốc | — | Chưa import n8n thật | Đã đọc hiểu nội dung khi viết docs, lịch mặc định tuần/tháng, xem §6 |
 | `kit/templates/*.xlsx` (5 mẫu) | Từ zip gốc, có công thức sống thật | — | **Chưa auto-fill** | Xem §5.5 — điền tay, không có script nối |
-| Base crawler (`media_platform/`, `api/routers/crawler.py`…) | Không sửa | Test gốc của repo | — | 6 test trong `test/` (không phải `tests/`) fail vì cần Redis/proxy thật — **có sẵn từ trước fork, không phải do kit** |
+| Base crawler (`media_platform/`, `api/routers/crawler.py`…) | **Có sửa (09/2026)**: đồng bộ upstream, phân trang Douyin, `goto_resilient`, chặn từ khoá rỗng — xem HANDOFF.md §1–2 | Test gốc của repo | — | 6 test trong `test/` (không phải `tests/`) fail vì cần Redis/proxy thật — **có sẵn từ trước fork, không phải do kit** |
 
 **Chạy để tự kiểm tra:** `pytest tests -q` (không phải `pytest -q` — thư mục `test/` là
 legacy của repo gốc, cần hạ tầng riêng, CI cũng chỉ chạy `tests/`).
@@ -319,7 +328,23 @@ cũ cho tương thích); `_run_analyzer` sinh slug từ nền tảng + từ kho�
 suy từ `Path(__file__)` chứ không phải CWD — trước đây chạy uvicorn từ thư mục khác thì báo
 cáo ghi ra chỗ `api/routers/kit.py` không đọc tới.
 
+### 5.19. Phiên 25/09/2026 — tóm tắt các "hố" (chi tiết ở HANDOFF.md §2–§7)
+
+- **Tìm kiếm Douyin:** từ khoá rỗng từng âm thầm rơi về `config.KEYWORDS`; phân trang chỉ 1
+  trang và chồng 5 bài/trang. Đã sửa, đã đo tham số thật của trang web.
+- **`Page.goto` timeout** trang chủ: chờ `load` là không cần; dùng `tools/page_nav.py`.
+- **Mọi file JSON mất trục thời gian** (`read_json` tự parse `create_time`) → KOC/Seasonal/SoV sai.
+- **File bình luận mất ~90%** vì bỏ trùng theo id bài → nay theo `comment_id`.
+- **Điểm trend chia max** → 1 bài viral ép cả bộ về ~0 → nay thứ hạng %.
+- **Cổng:** máy chủ dự án có vidauto (8000/8001/8765+), wovoice (8300), Flowboard (9223),
+  remotion (3100). MCP HTTP của repo dùng **8790**.
+- **CRLF:** `sed -i` có thể đổi `.bat` sang LF → giữ CRLF khi sửa.
+
 ## 6. Việc CHƯA làm — gợi ý lộ trình tiếp theo
+
+> **Ưu tiên hiện tại (đã được chủ dự án duyệt thiết kế):** report đợt 2 + 3 — Creator Audit,
+> Conversation Pulse, Structure & Hashtag Kit, Opportunity Map + mức tập trung, Momentum, LLM
+> cho ô nhận xét. Đặc tả + số liệu mẫu đã đo: **[`HANDOFF.md`](../HANDOFF.md) §6**.
 
 Sắp theo độ ưu tiên (dựa trên giá trị/công sức), không phải thứ tự bắt buộc:
 
@@ -354,6 +379,7 @@ Sắp theo độ ưu tiên (dựa trên giá trị/công sức), không phải t
 | `kit/README.md` | Người dùng cuối | Quick reference lệnh CLI |
 | `BUILD_GUIDE_ClaudeCode.md` | AI coding assistant (lịch sử) | Chuỗi 11 prompt gốc đã dùng để build — đã xong hết, giữ lại để tham khảo cách chia nhỏ task |
 | `CHANGELOG.md` | Mọi người | Lịch sử thay đổi theo version |
+| [`HANDOFF.md`](../HANDOFF.md) | AI coding assistant | Ghi chú bàn giao phiên gần nhất: đã sửa gì, vì sao, việc tiếp theo đã duyệt |
 
 ## 8. Checklist trước khi bắt đầu code tiếp
 

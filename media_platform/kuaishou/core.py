@@ -40,6 +40,7 @@ from model.m_kuaishou import VideoUrlInfo, CreatorUrlInfo
 from proxy.proxy_ip_pool import IpInfoModel, create_ip_pool
 from store import kuaishou as kuaishou_store
 from tools import utils
+from tools.page_nav import goto_resilient
 from tools.cdp_browser import CDPBrowserManager
 from var import comment_tasks_var, crawler_type_var, source_keyword_var
 
@@ -103,7 +104,7 @@ class KuaishouCrawler(AbstractCrawler):
             self.context_page = await self.browser_context.new_page()
             # 注入快手签名环境捕获脚本，页面加载后即可通过 __ks_realm 生成 __NS_hxfalcon 签名
             await self.context_page.add_init_script(KS_SIGN_CAPTURE_SCRIPT)
-            await self.context_page.goto(f"{self.index_url}?isHome=1")
+            await goto_resilient(self.context_page, f"{self.index_url}?isHome=1")
 
             # Create a client to interact with the kuaishou website.
             self.ks_client = await self.create_ks_client(httpx_proxy_format)
@@ -355,7 +356,7 @@ class KuaishouCrawler(AbstractCrawler):
                 for task in current_running_tasks:
                     task.cancel()
                 time.sleep(20)
-                await self.context_page.goto(f"{self.index_url}?isHome=1")
+                await goto_resilient(self.context_page, f"{self.index_url}?isHome=1")
                 await self.ks_client.update_cookies(
                     browser_context=self.browser_context,
                     urls=self.cookie_urls,

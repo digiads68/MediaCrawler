@@ -187,31 +187,35 @@ class DouYinClient(AbstractApiClient, ProxyRefreshMixin):
         sort_type: SearchSortType = SearchSortType.GENERAL,
         publish_time: PublishTimeType = PublishTimeType.UNLIMITED,
         search_id: str = "",
+        count: int = 10,
     ):
         """
         DouYin Web Search API
         :param keyword:
-        :param offset:
+        :param offset: 取上一页响应的 cursor（网页端 0 → 10 → 20 ...）
         :param search_channel:
         :param sort_type:
         :param publish_time: ·
-        :param search_id: ·
+        :param search_id: 首页响应 extra.logid，翻页时带上以保持同一搜索会话
+        :param count: 每页条数，与网页端一致为 10
         :return:
         """
+        # 参数与网页端 /search/<关键词> 实测一致 (2026-09): normal_search + single + count=10。
+        # 旧值 tab_search + multi + count=15 且翻页步长 10，会导致相邻页重叠 5 条。
         query_params = {
             'search_channel': search_channel.value,
             'enable_history': '1',
             'keyword': keyword,
-            'search_source': 'tab_search',
+            'search_source': 'normal_search',
             'query_correct_type': '1',
             'is_filter_search': '0',
-            'from_group_id': '7378810571505847586',
             'offset': offset,
-            'count': '15',
-            'need_filter_settings': '1',
-            'list_type': 'multi',
-            'search_id': search_id,
+            'count': str(count),
+            'need_filter_settings': '1' if offset == 0 else '0',
+            'list_type': 'single',
         }
+        if search_id:
+            query_params['search_id'] = search_id
         if sort_type.value != SearchSortType.GENERAL.value or publish_time.value != PublishTimeType.UNLIMITED.value:
             query_params["filter_selected"] = json.dumps({"sort_type": str(sort_type.value), "publish_time": str(publish_time.value)})
             query_params["is_filter_search"] = 1

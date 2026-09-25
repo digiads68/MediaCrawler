@@ -15,6 +15,7 @@ export interface CrawlerConfig {
   crawler_type: string
   keywords: string
   start_page: number
+  max_notes_count: number
   enable_comments: boolean
   enable_sub_comments: boolean
   enable_media: boolean

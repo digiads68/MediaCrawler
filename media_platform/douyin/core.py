@@ -37,6 +37,7 @@ from media_downloader import MediaDownloader
 from proxy.proxy_ip_pool import IpInfoModel, create_ip_pool
 from store import douyin as douyin_store
 from tools import utils
+from tools.page_nav import goto_resilient
 from tools.cdp_browser import CDPBrowserManager
 from var import crawler_type_var, source_keyword_var
 
@@ -98,7 +99,7 @@ class DouYinCrawler(AbstractCrawler):
                 await self.browser_context.add_init_script(path="libs/stealth.min.js")
 
             self.context_page = await self.browser_context.new_page()
-            await self.context_page.goto(self.index_url)
+            await goto_resilient(self.context_page, self.index_url)
 
             self.dy_client = await self.create_douyin_client(httpx_proxy_format)
             if not await self.dy_client.pong(browser_context=self.browser_context):
@@ -129,59 +130,73 @@ class DouYinCrawler(AbstractCrawler):
 
     async def search(self) -> None:
         utils.logger.info("[DouYinCrawler.search] Begin search douyin keywords")
-        dy_limit_count = 10  # douyin limit page fixed value
-        if config.CRAWLER_MAX_NOTES_COUNT < dy_limit_count:
-            config.CRAWLER_MAX_NOTES_COUNT = dy_limit_count
-        start_page = config.START_PAGE  # start page number
-        for keyword in config.KEYWORDS.split(","):
+        dy_limit_count = 10  # 网页端每页固定 10 条
+        max_count = max(1, config.CRAWLER_MAX_NOTES_COUNT)
+        # 最多翻页数：目标条数所需页数 + 余量（部分页因直播/用户卡片不足 10 条）
+        max_pages = (max_count + dy_limit_count - 1) // dy_limit_count + 3
+        start_offset = max(0, config.START_PAGE - 1) * dy_limit_count
+        for keyword in [k.strip() for k in config.KEYWORDS.split(",") if k.strip()]:
             source_keyword_var.set(keyword)
             utils.logger.info(f"[DouYinCrawler.search] Current keyword: {keyword}")
             aweme_list: List[str] = []
-            page = 0
+            seen_ids: set = set()
+            offset = start_offset
             dy_search_id = ""
-            while (page - start_page + 1) * dy_limit_count <= config.CRAWLER_MAX_NOTES_COUNT:
-                if page < start_page:
-                    utils.logger.info(f"[DouYinCrawler.search] Skip {page}")
-                    page += 1
-                    continue
+            pages_fetched = 0
+            while len(aweme_list) < max_count and pages_fetched < max_pages:
                 try:
-                    utils.logger.info(f"[DouYinCrawler.search] search douyin keyword: {keyword}, page: {page}")
+                    utils.logger.info(f"[DouYinCrawler.search] search douyin keyword: {keyword}, offset: {offset}")
                     posts_res = await self.dy_client.search_info_by_keyword(
                         keyword=keyword,
-                        offset=page * dy_limit_count - dy_limit_count,
+                        offset=offset,
                         publish_time=PublishTimeType(config.PUBLISH_TIME_TYPE),
                         search_id=dy_search_id,
+                        count=dy_limit_count,
                     )
-                    if posts_res.get("data") is None or posts_res.get("data") == []:
-                        utils.logger.info(f"[DouYinCrawler.search] search douyin keyword: {keyword}, page: {page} is empty,{posts_res.get('data')}`")
-                        break
                 except DataFetchError:
                     utils.logger.error(f"[DouYinCrawler.search] search douyin keyword: {keyword} failed")
                     break
-
-                page += 1
+                pages_fetched += 1
                 if "data" not in posts_res:
                     utils.logger.error(f"[DouYinCrawler.search] search douyin keyword: {keyword} failed，账号也许被风控了。")
                     break
-                dy_search_id = posts_res.get("extra", {}).get("logid", "")
+                if not posts_res.get("data"):
+                    utils.logger.info(f"[DouYinCrawler.search] search douyin keyword: {keyword}, offset: {offset} is empty")
+                    break
+                if not dy_search_id:
+                    dy_search_id = posts_res.get("extra", {}).get("logid", "")
                 page_aweme_list = []
                 for post_item in posts_res.get("data"):
+                    if len(aweme_list) >= max_count:
+                        break
                     try:
                         aweme_info: Dict = (post_item.get("aweme_info") or post_item.get("aweme_mix_info", {}).get("mix_items")[0])
-                    except TypeError:
+                    except (TypeError, IndexError):
                         continue
-                    aweme_list.append(aweme_info.get("aweme_id", ""))
-                    page_aweme_list.append(aweme_info.get("aweme_id", ""))
+                    aweme_id = (aweme_info or {}).get("aweme_id", "")
+                    # 跳过非视频卡片（直播/用户）与跨页重复
+                    if not aweme_id or aweme_id in seen_ids:
+                        continue
+                    seen_ids.add(aweme_id)
+                    aweme_list.append(aweme_id)
+                    page_aweme_list.append(aweme_id)
                     await douyin_store.update_douyin_aweme(aweme_item=aweme_info)
                     await self.download_media(aweme_item=aweme_info)
-                
+
                 # Batch get note comments for the current page
                 await self.batch_get_note_comments(page_aweme_list)
 
+                # 按响应的 cursor/has_more 翻页（与网页端一致），而非固定步长
+                if not posts_res.get("has_more"):
+                    utils.logger.info(f"[DouYinCrawler.search] keyword: {keyword} has no more results")
+                    break
+                next_offset = posts_res.get("cursor")
+                offset = next_offset if isinstance(next_offset, int) and next_offset > offset else offset + dy_limit_count
+
                 # Sleep after each page navigation
                 await asyncio.sleep(config.CRAWLER_MAX_SLEEP_SEC)
-                utils.logger.info(f"[DouYinCrawler.search] Sleeping for {config.CRAWLER_MAX_SLEEP_SEC} seconds after page {page-1}")
-            utils.logger.info(f"[DouYinCrawler.search] keyword:{keyword}, aweme_list:{aweme_list}")
+                utils.logger.info(f"[DouYinCrawler.search] Sleeping for {config.CRAWLER_MAX_SLEEP_SEC} seconds after offset {offset}")
+            utils.logger.info(f"[DouYinCrawler.search] keyword:{keyword}, got {len(aweme_list)}/{max_count}, aweme_list:{aweme_list}")
 
     async def get_specified_awemes(self):
         """Get the information and comments of the specified post from URLs or IDs"""

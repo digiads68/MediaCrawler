@@ -54,6 +54,7 @@ const defaultConfig: CrawlerConfig = {
   specified_ids: '',
   creator_ids: '',
   start_page: 1,
+  max_notes_count: 15,
   enable_comments: true,
   enable_sub_comments: false,
   enable_media: false,

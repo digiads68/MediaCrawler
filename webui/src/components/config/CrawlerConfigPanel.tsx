@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Button } from '@/components/ui/button'
+import { toast } from 'sonner'
 import { useCrawlerStore } from '@/store/crawlerStore'
 import { usePlatforms, useConfigOptions, useStartCrawler, useStopCrawler } from '@/hooks/useCrawler'
 import { ParsedIdList } from './ParsedIdList'
@@ -79,15 +80,20 @@ function KeywordInput({ value, onChange, placeholder, disabled }: KeywordInputPr
   // 将逗号分隔的字符串转换为数组
   const keywords = value ? value.split(',').map((k) => k.trim()).filter(Boolean) : []
 
+  // 把输入框里未确认的文字加入关键词（支持一次粘贴 "a,b"）。
+  // 以前只有按回车才生效：输入后直接点开始会以空关键词启动，
+  // 后端随即回退到 config 默认关键词，结果与所输入的完全无关。
+  const commitInput = () => {
+    const pending = inputValue.split(/[,，]/).map((k) => k.trim()).filter(Boolean)
+    const fresh = pending.filter((k, i) => !keywords.includes(k) && pending.indexOf(k) === i)
+    if (fresh.length) onChange([...keywords, ...fresh].join(','))
+    setInputValue('')
+  }
+
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
+    if (e.key === 'Enter' || e.key === ',' || e.key === '，') {
       e.preventDefault()
-      const trimmed = inputValue.trim()
-      if (trimmed && !keywords.includes(trimmed)) {
-        const newKeywords = [...keywords, trimmed]
-        onChange(newKeywords.join(','))
-        setInputValue('')
-      }
+      commitInput()
     }
   }
 
@@ -102,6 +108,7 @@ function KeywordInput({ value, onChange, placeholder, disabled }: KeywordInputPr
         value={inputValue}
         onChange={(e) => setInputValue(e.target.value)}
         onKeyDown={handleKeyDown}
+        onBlur={commitInput}
         placeholder={placeholder}
         disabled={disabled}
         className="h-9 text-xs"
@@ -147,7 +154,13 @@ export function CrawlerConfigPanel() {
   const isBusy = isStarting || isStopping || status === 'stopping'
 
   const handleStart = () => {
-    startCrawler(config)
+    // 读最新状态：关键词输入框 blur 刚提交的关键词可能还没进入本次渲染的闭包
+    const latest = useCrawlerStore.getState().config
+    if (latest.crawler_type === 'search' && !latest.keywords.split(',').some((k) => k.trim())) {
+      toast.error(t('field.keywordsRequired'))
+      return
+    }
+    startCrawler(latest)
   }
 
   const handleStop = () => {
@@ -214,6 +227,20 @@ export function CrawlerConfigPanel() {
               />
             </Field>
           </div>
+
+          <Field label={t('field.maxNotes')} hint={t('field.maxNotesHint')}>
+            <Input
+              type="number"
+              min={1}
+              max={500}
+              value={config.max_notes_count ?? 15}
+              onChange={(e) =>
+                updateConfig({ max_notes_count: Math.min(500, Math.max(1, parseInt(e.target.value) || 15)) })
+              }
+              disabled={isDisabled}
+              className="h-9 text-xs"
+            />
+          </Field>
 
           {/* 根据爬虫类型显示不同的输入框 */}
           {config.crawler_type === 'search' && (

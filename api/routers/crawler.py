@@ -27,6 +27,15 @@ router = APIRouter(prefix="/crawler", tags=["crawler"])
 @router.post("/start")
 async def start_crawler(request: CrawlerStartRequest):
     """Start crawler task"""
+    # Search mode without keywords used to fall back silently to config.KEYWORDS
+    # (编程副业,编程兼职), returning results for the wrong keyword. Reject instead.
+    if request.crawler_type.value == "search" and not any(
+        k.strip() for k in request.keywords.split(",")
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="Search mode requires at least one keyword (type it and press Enter)",
+        )
     success = await crawler_manager.start(request)
     if not success:
         # Handle concurrent/duplicate requests: if process is already running, return 400 instead of 500

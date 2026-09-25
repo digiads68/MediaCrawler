@@ -1,5 +1,35 @@
 # CHANGELOG
 
+## Report đợt 1 — 2026-09-25
+
+- **Trend Radar làm lại:** khung Kết luận + 3 việc nên làm, KPI có chip trạng thái, bằng
+  chứng (mục tiêu nội dung, tuổi bài, hashtag), lưới thẻ đủ mọi bài có phân trang. Giữ
+  nguyên preview, ▶ Xem, ⬇ Tải, Copy hook và bộ lọc cũ; thêm lọc từ khoá / mục tiêu / tuổi,
+  sắp theo mới đăng. Module mới `kit/analyzer/insights.py`.
+- **Bỏ mọi giới hạn dòng:** Trend 20, Hook 40, Sound 30, Moodboard 120, Comment Bank 800,
+  bảng HTML 15–60 dòng. Excel đủ dòng.
+- **Điểm trend theo thứ hạng %** thay cho chia max (1 bài viral từng ép mọi bài về ~0).
+- **Ô Nhận xét tổng quan** ở mọi report, chuẩn bị chỗ cho LLM (xem kit/README.md).
+- **Giao diện mới** cho mọi report: màu cố định theo chỉ số, chip trạng thái, font Be Vietnam Pro.
+- Fix: mọi file **JSON** mất trục thời gian (`read_json` tự đổi `create_time` → NaT) làm
+  sai KOC / Seasonal / SoV / tuổi bài.
+- Fix: file **bình luận** bị bỏ trùng theo id bài → mất ~90% bình luận (3.588 → 362).
+  Nay theo `comment_id` (VoC: 273 → 2.330 bình luận dùng được).
+- Fix: `Page.goto` timeout ở trang chủ (Douyin/XHS/Bilibili/Weibo/Kuaishou) — `tools/page_nav.py`.
+
+## Sửa độ chính xác tìm kiếm Douyin — 2026-09-25
+
+- **Từ khoá rỗng → âm thầm dùng từ khoá mặc định.** Ô KEYWORDS chỉ nhận khi nhấn Enter;
+  bấm Initiate Scan khi chưa Enter thì crawler cào `编程副业,编程兼职` của config.
+  Nay WebUI tự thêm chữ đang gõ (blur/dấu phẩy), chặn Start khi rỗng; API `/api/crawler/start`
+  trả 400 nếu search không có từ khoá (áp cho cả MCP).
+- **Phân trang Douyin sai.** Chỉ chạy 1 trang/từ khoá khi MAX=15; `count=15` nhưng offset bước
+  10 → trang chồng 5 bài (nguồn dòng trùng 20–29%). Nay theo `cursor`/`has_more` như web
+  (đo thật 2026-09: `normal_search`, `list_type=single`, `count=10`), bỏ trùng, dừng đúng số bài.
+- WebUI thêm ô **MAX_POSTS / KEYWORD** (mặc định 15, tối đa 500).
+- Kiểm chứng `#aigc`: 30/30 bài, 0 trùng; khớp 19/30 với trang web (top 10: 8/10) — phần lệch
+  do Douyin cá nhân hoá/xếp lại kết quả mỗi phiên tìm kiếm.
+
 ## Đồng bộ upstream — 2026-09-25
 
 Cập nhật base crawler từ [NanmiCoder/MediaCrawler](https://github.com/NanmiCoder/MediaCrawler)

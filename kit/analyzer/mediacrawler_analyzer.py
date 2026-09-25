@@ -45,11 +45,15 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
 
 # Nguồn sự thật của COUNT_COLS/FORMAT_RULES/normalize nằm ở kit/enrich/normalize.py
-from kit.enrich.normalize import (COUNT_COLS, FORMAT_RULES,  # noqa: E402,F401
-                                  normalize, tag_format_stats, tag_hook,
-                                  text_series)
-from kit.enrich.schema import (add_canonical, dedupe_posts,  # noqa: E402
-                              infer_platform, music_id_of)
+from kit.enrich.normalize import (  # noqa: E402,F401
+    COUNT_COLS,
+    FORMAT_RULES,
+    normalize,
+    tag_format_stats,
+    tag_hook,
+    text_series,
+)
+from kit.enrich.schema import add_canonical, dedupe_posts, infer_platform, music_id_of  # noqa: E402
 
 # ============================================================================
 # 0. TIỆN ÍCH CHUNG — nạp & chuẩn hoá dữ liệu MediaCrawler
@@ -69,7 +73,10 @@ def _read_raw(path: str | Path) -> pd.DataFrame:
     if p.suffix == ".xlsx":
         return pd.read_excel(p)
     if p.suffix in (".jsonl", ".json"):
-        return pd.read_json(p, lines=(p.suffix == ".jsonl"))
+        # convert_dates=False: mặc định pandas tự đổi `create_time` sang datetime,
+        # rồi normalize() coi nó là epoch -> NaT -> mọi file JSON mất trục thời
+        # gian (KOC/Seasonal/SOV/tuổi bài sai). Giữ nguyên số epoch như file Excel.
+        return pd.read_json(p, lines=(p.suffix == ".jsonl"), convert_dates=False)
     if p.suffix == ".csv":
         return pd.read_csv(p)
     raise ValueError(f"Định dạng chưa hỗ trợ: {p.suffix}")
@@ -115,6 +122,11 @@ def load_many(paths: Sequence[str | Path]) -> pd.DataFrame:
 REPORTS_DIR = Path(__file__).resolve().parents[2] / "reports"
 
 
+def _take(df: pd.DataFrame, n: int | None) -> pd.DataFrame:
+    """N dòng đầu; None = giữ hết (mặc định mọi lệnh: báo cáo phải đủ dữ liệu đã cào)."""
+    return df if n is None else df.head(n)
+
+
 def _out(df: pd.DataFrame, name: str) -> Path:
     REPORTS_DIR.mkdir(exist_ok=True)
     p = REPORTS_DIR / name
@@ -143,25 +155,27 @@ def _out_sheets(sheets: dict[str, pd.DataFrame], name: str) -> Path:
 # CS1 + CS10 · TREND RADAR & SOUND WATCHLIST
 # ============================================================================
 
-def trend_radar(df: pd.DataFrame, top: int = 20) -> dict:
+def trend_radar(df: pd.DataFrame, top: int | None = None) -> dict:
     """
-    Chấm điểm trend cho từng bài:
-      trend_score = 0.4*save_norm + 0.3*share_norm + 0.2*comment_norm + 0.1*like_norm
-    (save & share nặng nhất — báo hiệu format đáng bản địa hoá).
-    Đồng thời gom sound xuất hiện lặp -> watchlist nhạc trending.
+    Chấm điểm trend cho từng bài và tổng hợp kết luận cho báo cáo.
+
+    trend_score (0–100) = trung bình có trọng số THỨ HẠNG phần trăm của
+    lưu 0.4 · chia sẻ 0.3 · bình luận 0.2 · like 0.1 (xem kit/analyzer/insights.py).
+    Trước đây chia cho giá trị lớn nhất nên 1 bài viral ép mọi bài khác về ~0.
+
+    Args:
+        df: dữ liệu đã chuẩn hoá (`load`).
+        top: None = giữ MỌI bài (mặc định — báo cáo và Excel phải đủ dữ liệu đã
+            cào); số nguyên = chỉ giữ N bài điểm cao nhất.
     """
-    d = df.copy()
-    for col, w in [("collected_count", .4), ("share_count", .3),
-                   ("comment_count", .2), ("liked_count", .1)]:
-        if col in d.columns and d[col].max() > 0:
-            d[f"_{col}"] = w * d[col] / d[col].max()
-        else:
-            d[f"_{col}"] = 0
-    d["trend_score"] = (d["_collected_count"] + d["_share_count"]
-                        + d["_comment_count"] + d["_liked_count"]) * 100
+    from kit.analyzer.insights import add_post_insights, trend_summary
+
+    d = add_post_insights(df)
+    platform = str(d["platform"].iloc[0]) if "platform" in d.columns and len(d) else ""
     cols = [c for c in ["title", "format", "source_keyword", "liked_count",
                         "collected_count", "share_count", "comment_count",
                         "trend_score", "save_rate", "share_rate",
+                        "goal", "goal_label", "age_days", "creator_hash", "desc", "tag_list",
                         "nickname", "created_at", "cover_url",
                         # canonical: nền tảng + cover gộp (xhs lưu cover trong
                         # image_list nên không có cột cover_url) + chỉ số đã map
@@ -173,7 +187,8 @@ def trend_radar(df: pd.DataFrame, top: int = 20) -> dict:
                         # bili=download_url, xhs=video_url (là MP4 trên CDN).
                         "aweme_url", "note_url", "video_url",
                         "video_download_url", "download_url"] if c in d.columns]
-    top_posts = d.sort_values("trend_score", ascending=False).head(top)[cols]
+    ranked = d.sort_values("trend_score", ascending=False)
+    top_posts = (ranked if top is None else ranked.head(top))[cols]
 
     # Format nào đang thắng.
     # save_tb phải suy cột theo nền tảng: bilibili/weibo không có
@@ -212,14 +227,15 @@ def trend_radar(df: pd.DataFrame, top: int = 20) -> dict:
     _out(fmt, "CS1_trend_formats.xlsx")
     if len(sounds):
         _out(sounds, "CS10_sound_watchlist.xlsx")
-    return {"top_posts": top_posts, "formats": fmt, "sounds": sounds}
+    return {"top_posts": top_posts, "formats": fmt, "sounds": sounds,
+            "summary": trend_summary(d, platform)}
 
 
 # ============================================================================
 # CS2 · INSIGHT / COMMENT BANK
 # ============================================================================
 
-def comment_bank(df: pd.DataFrame, min_like: int = 1, top: int = 800) -> pd.DataFrame:
+def comment_bank(df: pd.DataFrame, min_like: int = 1, top: int | None = None) -> pd.DataFrame:
     """
     Chuẩn bị comment cho LLM phân cụm: lọc rác, dedupe, xếp theo like,
     cắt top N để vừa context window. Đầu ra nạp thẳng vào prompt phân cụm
@@ -234,7 +250,7 @@ def comment_bank(df: pd.DataFrame, min_like: int = 1, top: int = 800) -> pd.Data
     d = d.drop_duplicates("content")
     if "like_count" in d.columns:
         d = d[d["like_count"] >= min_like].sort_values("like_count", ascending=False)
-    d = d.head(top).reset_index(drop=True)
+    d = _take(d, top).reset_index(drop=True)
     _out(d, "CS2_comment_bank.xlsx")
     return d
 
@@ -540,7 +556,7 @@ def format_playbook(df: pd.DataFrame, top_examples: int = 8) -> dict:
             u = u.sort_values("eng_total", ascending=False)
         keep = [c for c in ("title", "hook_text", "hook_type", "eng_total",
                             "platform", "source_keyword") if c in u.columns]
-        unclassified = u[keep].head(30)
+        unclassified = u[keep]
 
     examples = pd.DataFrame()
     if len(stats):
@@ -562,7 +578,7 @@ def format_playbook(df: pd.DataFrame, top_examples: int = 8) -> dict:
 # CS12 · HOOK LAB (người viết kịch bản — viết câu mở đầu)
 # ============================================================================
 
-def hook_lab(df: pd.DataFrame, top: int = 40) -> dict:
+def hook_lab(df: pd.DataFrame, top: int | None = None) -> dict:
     """
     Mổ xẻ câu mở đầu: kiểu hook nào ăn, dài bao nhiêu thì tốt, ai đang dùng.
 
@@ -599,8 +615,8 @@ def hook_lab(df: pd.DataFrame, top: int = 40) -> dict:
                         "aweme_url", "note_url", "video_url",
                         "video_download_url", "download_url",
                         "music_download_url"] if c in d.columns]
-    top_posts = (d.sort_values("eng_total", ascending=False).head(top)[cols]
-                 if "eng_total" in d.columns else d.head(top)[cols])
+    top_posts = _take(d.sort_values("eng_total", ascending=False)
+                      if "eng_total" in d.columns else d, top)[cols]
 
     _out(types, "CS12_hook_lab_types.xlsx")
     _out(top_posts, "CS12_hook_lab_top.xlsx")
@@ -619,7 +635,7 @@ def _count_images(v: object) -> int:
     return len([x for x in s.split(",") if x.strip()]) if s else 0
 
 
-def sound_edit_kit(df: pd.DataFrame, top: int = 30) -> dict:
+def sound_edit_kit(df: pd.DataFrame, top: int | None = None) -> dict:
     """
     Bộ tư liệu cho editor: nhạc dùng lại + kết cấu nội dung.
 
@@ -633,8 +649,7 @@ def sound_edit_kit(df: pd.DataFrame, top: int = 30) -> dict:
     hashtag. Đây là các yếu tố kết cấu DUY NHẤT đo được từ dữ liệu (không có
     thời lượng, không có cắt cảnh), và đều hành động được ngay khi dựng.
     """
-    from kit.enrich.lexicon import (HASHTAG_COUNT_BUCKETS, IMAGE_COUNT_BUCKETS,
-                                    bucket_of)
+    from kit.enrich.lexicon import HASHTAG_COUNT_BUCKETS, IMAGE_COUNT_BUCKETS, bucket_of
     from kit.enrich.schema import split_hashtags
 
     d = tag_hook(df).copy()
@@ -683,8 +698,8 @@ def sound_edit_kit(df: pd.DataFrame, top: int = 30) -> dict:
                         "aweme_url", "note_url", "video_url",
                         "video_download_url", "download_url",
                         "music_download_url"] if c in d.columns]
-    shelf = (d.sort_values("eng_total", ascending=False).head(top)[cols]
-             if "eng_total" in d.columns else d.head(top)[cols])
+    shelf = _take(d.sort_values("eng_total", ascending=False)
+                  if "eng_total" in d.columns else d, top)[cols]
 
     if len(sounds):
         _out(sounds, "CS10_sound_watchlist.xlsx")
@@ -699,7 +714,7 @@ def sound_edit_kit(df: pd.DataFrame, top: int = 30) -> dict:
 # CS15 · COVER MOODBOARD (đạo diễn — tường ảnh tham khảo)
 # ============================================================================
 
-def cover_moodboard(df: pd.DataFrame, top: int = 120) -> dict:
+def cover_moodboard(df: pd.DataFrame, top: int | None = None) -> dict:
     """
     Tường ảnh cover của bài top, xếp theo hạng phần trăm engagement.
 
@@ -723,7 +738,7 @@ def cover_moodboard(df: pd.DataFrame, top: int = 120) -> dict:
     if "eng_total" in have.columns:
         have["pct_rank"] = (have["eng_total"].rank(pct=True) * 100).round(1)
         have = have.sort_values("eng_total", ascending=False)
-    board = have.head(top)
+    board = _take(have, top)
 
     kinds = _group_metrics(have, "format")
     cols = [c for c in ["cover", "hook_text", "format", "hook_type", "pct_rank",

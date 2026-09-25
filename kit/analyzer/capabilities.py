@@ -17,8 +17,6 @@ from typing import Any
 
 import pandas as pd
 
-from kit.enrich.normalize import normalize
-
 # Cột đếm engagement CẤP BÀI ĐĂNG — cần ít nhất 1 cột có số > 0.
 #
 # CỐ Ý không liệt kê cột cấp bình luận (`like_count`, `comment_like_count`,

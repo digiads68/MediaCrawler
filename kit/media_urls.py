@@ -16,7 +16,7 @@ Proxy giải quyết cả hai: gắn Referer đúng nền tảng + ép header at
 from __future__ import annotations
 
 import re
-from urllib.parse import urlparse, unquote
+from urllib.parse import unquote, urlparse
 
 # Host CDN thuần media — mọi URL trên các host này là file media trực tiếp
 # (không phải trang xem). Khớp theo hậu tố domain.

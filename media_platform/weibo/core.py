@@ -42,6 +42,7 @@ from media_downloader import MediaDownloader
 from proxy.proxy_ip_pool import IpInfoModel, create_ip_pool
 from store import weibo as weibo_store
 from tools import utils
+from tools.page_nav import goto_resilient
 from tools.cdp_browser import CDPBrowserManager
 from var import crawler_type_var, source_keyword_var
 
@@ -97,7 +98,7 @@ class WeiboCrawler(AbstractCrawler):
 
 
             self.context_page = await self.browser_context.new_page()
-            await self.context_page.goto(self.index_url)
+            await goto_resilient(self.context_page, self.index_url)
             await asyncio.sleep(2)
 
 
@@ -115,7 +116,7 @@ class WeiboCrawler(AbstractCrawler):
 
                 # After successful login, redirect to mobile website and update mobile cookies
                 utils.logger.info("[WeiboCrawler.start] redirect weibo mobile homepage and update cookies on mobile platform")
-                await self.context_page.goto(self.mobile_index_url)
+                await goto_resilient(self.context_page, self.mobile_index_url)
                 await asyncio.sleep(3)
                 # Only get mobile cookies to avoid confusion between PC and mobile cookies
                 await self.wb_client.update_cookies(

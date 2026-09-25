@@ -91,6 +91,19 @@ Sửa đường dẫn `executeCommand` cho khớp máy chủ (mặc định `/op
 | `queue/` | Chạy nhiều ngách theo hàng đợi (cần Redis) | `arq kit.queue.worker.WorkerSettings` + `python kit/queue/enqueue.py dy search "kw" --analyze trend` |
 | REST `/kit/*` | Gọi kit qua HTTP | `POST /kit/analyze`, `GET /kit/reports/{name}`, `POST /kit/angle-brief` |
 
+### Báo cáo HTML (giao diện 09/2026)
+
+- **Đủ dữ liệu:** mọi report hiện đủ số dòng đã cào (không còn cắt top 20/30/40/120);
+  lưới thẻ và bảng có phân trang, chọn được "Tất cả". Excel cũng đủ dòng.
+- **Trend Radar** đọc theo 3 tầng: Kết luận (câu nhận định + 3 việc nên làm) → Bằng chứng
+  (mục tiêu nội dung Lưu/Bàn luận/Lan truyền, tuổi bài, hashtag, format) → lưới thẻ đầy đủ
+  (giữ preview, ▶ Xem, ⬇ Tải, Copy hook; lọc thêm theo từ khoá, mục tiêu, tuổi bài).
+  Luật và ngưỡng nằm ở đầu `analyzer/insights.py`.
+- **Điểm trend** là thứ hạng phần trăm (lưu 40 · chia sẻ 30 · bình luận 20 · like 10).
+- **Ô "Nhận xét tổng quan"** có ở mọi report: ghi chú lưu trên trình duyệt, nút copy prompt +
+  dữ liệu cho ChatGPT. Dữ liệu tóm tắt gắn sẵn trong `<script id="report-summary">`;
+  khối `#llm-commentary` để dành cho bước tự động gọi LLM sau này.
+
 Ví dụ chuỗi đầy đủ Tier 1:
 
 ```bash

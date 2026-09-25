@@ -198,7 +198,7 @@ _COVER_CANDIDATES: tuple[str, ...] = ("cover_url", "video_cover_url", "cover_url
 _MEDIA_EXTS = (".mp3", ".m4a", ".aac", ".wav", ".mp4", ".flv", ".webm")
 
 
-def cover_of_row(r: "pd.Series") -> str:
+def cover_of_row(r: pd.Series) -> str:
     """
     Link ảnh cover của 1 dòng, thử lần lượt các tên cột rồi tới `image_list`.
 
@@ -327,12 +327,16 @@ def dedupe_posts(df: pd.DataFrame, *, verbose: bool = True) -> pd.DataFrame:
     if ids.isna().all() or not ids.astype(str).str.strip().any():
         return df
 
-    keys = ["post_id"]
+    # File BÌNH LUẬN cũng có cột id bài (aweme_id/video_id/note_id -> post_id), nhưng
+    # mỗi bài có nhiều bình luận. Bỏ trùng theo post_id ở đây sẽ xoá gần hết bình
+    # luận (đo thật: 3.588 -> 362, mất 90%). Với file bình luận, khoá là comment_id.
+    id_col = "comment_id" if "comment_id" in df.columns and df["comment_id"].notna().any() else "post_id"
+    keys = [id_col]
     if "platform" in df.columns:
         keys.insert(0, "platform")
     before = len(df)
     out = df.drop_duplicates(subset=keys, keep="first")
     removed = before - len(out)
     if removed and verbose:
-        print(f"[!] Bỏ {removed} dòng trùng post_id ({before} -> {len(out)})")
+        print(f"[!] Bỏ {removed} dòng trùng {id_col} ({before} -> {len(out)})")
     return out.reset_index(drop=True)

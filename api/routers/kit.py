@@ -132,8 +132,7 @@ async def kit_media_download(
     """
     import httpx
 
-    from kit.media_urls import (BROWSER_UA, is_allowed_for_proxy, referer_for,
-                                safe_filename)
+    from kit.media_urls import BROWSER_UA, is_allowed_for_proxy, referer_for, safe_filename
     from tools.httpx_util import make_async_client
 
     if not is_allowed_for_proxy(url):

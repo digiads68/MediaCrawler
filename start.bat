@@ -56,6 +56,37 @@ if errorlevel 1 (
 set VENV_PY=.venv\Scripts\python.exe
 
 REM ---------------------------------------------------------------
+REM 2b. Cong 8080 da co server? Chay start.bat lan 2 khi server cu con
+REM     song -> uvicorn moi loi WinError 10048 roi tat, trong nhu crash.
+REM     Kiem tra truoc: la MediaCrawler thi mo WebUI roi thoat; la app
+REM     khac thi bao ten tien trinh dang giu cong.
+REM ---------------------------------------------------------------
+netstat -ano | findstr /R /C:"TCP.*:8080 .*LISTENING" >nul
+if errorlevel 1 goto :port_free
+"%VENV_PY%" -c "import urllib.request,sys; sys.exit(0 if b'ok' in urllib.request.urlopen('http://127.0.0.1:8080/api/health',timeout=3).read() else 1)" >nul 2>nul
+if errorlevel 1 goto :port_taken
+echo.
+echo [!] MediaCrawler DA CHAY san tren cong 8080 (co cua so start.bat khac dang mo).
+echo     Khong khoi dong them ban thu hai. Dang mo WebUI: http://localhost:8080
+echo     Muon khoi dong lai: dong cua so start.bat cu (Ctrl+C) roi chay lai file nay.
+start "" http://localhost:8080
+echo.
+pause
+exit /b 0
+
+:port_taken
+echo.
+echo [LOI] Cong 8080 dang bi ung dung KHAC chiem (khong phai MediaCrawler):
+for /f "tokens=5" %%p in ('netstat -ano ^| findstr /R /C:"TCP.*:8080 .*LISTENING"') do (
+    for /f "tokens=1" %%n in ('tasklist /FI "PID eq %%p" /NH') do echo     PID %%p - %%n
+)
+echo     Tat ung dung do (hoac doi cong cua no) roi chay lai file nay.
+pause
+exit /b 1
+
+:port_free
+
+REM ---------------------------------------------------------------
 REM 3. Cai dependencies (requirements.txt + goi cua DigiAds Kit)
 REM    Chay moi lan start - pip tu bo qua goi da du, nen nhanh.
 REM ---------------------------------------------------------------

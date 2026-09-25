@@ -13,9 +13,12 @@
    thật (theo commit), quyết định kỹ thuật quan trọng **và lý do**, các "hố" môi trường đã
    rơi vào và cách đã xử lý, việc còn thiếu. **Đọc kỹ trước khi code** — tiết kiệm rất nhiều
    thời gian dò lại những gì đã dò rồi.
-3. **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** — luồng dữ liệu kỹ thuật (6 tầng:
+3. **[HANDOFF.md](HANDOFF.md)** — ghi chú bàn giao của **phiên làm việc gần nhất**: đã sửa
+   gì, vì sao, file nào, việc tiếp theo chủ dự án đã duyệt (kèm đặc tả + số liệu mẫu).
+   Đọc trước khi làm tiếp report/crawler.
+4. **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** — luồng dữ liệu kỹ thuật (6 tầng:
    crawl → enrich → storage → analyzer → pipeline → tự động hoá).
-4. **[docs/HUONG_DAN_SU_DUNG.md](docs/HUONG_DAN_SU_DUNG.md)** — góc nhìn nghiệp vụ: ai
+5. **[docs/HUONG_DAN_SU_DUNG.md](docs/HUONG_DAN_SU_DUNG.md)** — góc nhìn nghiệp vụ: ai
    dùng chức năng nào, case study cụ thể, dashboard mẫu.
 
 ## 1 dòng tóm tắt dự án
@@ -31,8 +34,8 @@ agency marketing/bán hàng Việt Nam (TikTok Shop, livestream).
 cd MediaCrawler
 git log --oneline -15         # đã làm gì gần nhất
 git status                    # có gì chưa commit không (đừng code chồng lên thay đổi dở)
-pytest tests -q                # phải thấy "148 passed" (hoặc nhiều hơn) — đỏ thì SỬA TRƯỚC, đừng code tiếp
-ruff check .                  # phải "All checks passed!"
+pytest tests -q                # phải thấy "538 passed" (hoặc nhiều hơn) — đỏ thì SỬA TRƯỚC, đừng code tiếp
+uvx ruff check .              # phải "All checks passed!" (ruff không cài trong .venv — dùng uvx)
 ```
 
 Nếu 2 lệnh cuối không xanh, đừng vội cho rằng bug do bạn gây ra — kiểm tra

@@ -117,10 +117,18 @@ def normalize_counts(df: pd.DataFrame) -> pd.DataFrame:
     # (vốn cần trục thời gian) chạy được với mọi nền tảng.
     time_col = next((c for c in ("create_time", "time") if c in df.columns), None)
     if time_col:
-        ts = pd.to_numeric(df[time_col], errors="coerce")
-        # MediaCrawler lưu epoch giây hoặc mili-giây tuỳ nền tảng
-        ts = ts.where(ts < 1e12, ts / 1000)
-        df["created_at"] = pd.to_datetime(ts, unit="s", errors="coerce")
+        raw = df[time_col]
+        if pd.api.types.is_datetime64_any_dtype(raw):
+            # Đã là datetime (vd DataFrame đọc bằng read_json mặc định) -> dùng luôn
+            created = pd.to_datetime(raw, errors="coerce")
+            if getattr(created.dt, "tz", None) is not None:
+                created = created.dt.tz_convert(None)
+            df["created_at"] = created
+        else:
+            ts = pd.to_numeric(raw, errors="coerce")
+            # MediaCrawler lưu epoch giây hoặc mili-giây tuỳ nền tảng
+            ts = ts.where(ts < 1e12, ts / 1000)
+            df["created_at"] = pd.to_datetime(ts, unit="s", errors="coerce")
         df["week"] = df["created_at"].dt.strftime("%G-W%V")
     return df
 
