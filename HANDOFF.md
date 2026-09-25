@@ -223,6 +223,15 @@ Làm theo đúng khung đợt 1 (3 tầng, token màu, `_media_grid`/`_table` đ
 7. Tính năng LLM cho ô nhận xét (§4.4).
 8. Kiểm tra phân trang của các nền tảng khác (mới sửa Douyin — xhs/bili/ks/wb chưa rà).
 
+### ⚠️ Nhánh chưa merge trùng phạm vi đợt 2 — ĐỌC TRƯỚC KHI CODE
+Trên GitHub có nhánh **`claude/social-media-analytics-dashboard-mto92x`** (2 commit, 25/07/2026,
+một phiên Claude khác): `kit/dashboard/` (`metrics.py`, `components.py`, `theme.py`,
+`profiles/{search,creator,video,overview}.py`), `kit/n8n/WF_MC4_content_action.json`,
+`tests/test_dashboard.py` — ~4.200 dòng, "tách dashboard thành 4 loại chuyên sâu theo mode cào".
+Chưa merge vào `main`, chưa được đối chiếu với report đợt 1. **Hỏi chủ dự án** trước khi làm đợt 2:
+merge nhánh đó rồi xây Creator Audit trên `profiles/creator.py`, hay bỏ nhánh đó và làm theo §6.
+Không tự merge — nhánh rẽ từ trước đợt đồng bộ upstream và trước report đợt 1, sẽ xung đột.
+
 ### Chưa quyết (hỏi chủ dự án)
 - Đồng bộ lại `kit/analyzer/registry.py` + `capabilities.py` + WebUI `AnalyzeDialog` khi đổi
   tên / gộp report ở đợt 2.
