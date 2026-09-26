@@ -80,13 +80,21 @@ def _run_analyzer(command: str, file_path: str, to_supabase: bool = False,
             from kit.webhook import notify_trend_brief
             notify_trend_brief(f"Trend radar xong: {rows} bài top.")
     elif command == "insight":
-        report_data = an.comment_bank(df)
-        rows = len(report_data)
+        from kit.analyzer.conversation import conversation_pulse, sibling_contents_file
+        bank = an.comment_bank(df)
+        # File bài cùng phiên (search_contents_X cạnh search_comments_X) -> độ phủ + thời gian đến
+        sib = sibling_contents_file(file_path)
+        posts_df = an.load(sib) if sib else None
+        report_data = {"bank": bank, "pulse": conversation_pulse(df, posts_df)}
+        rows = len(bank)
         xlsx_files = ["CS2_comment_bank.xlsx"]
     elif command == "koc":
+        from kit.analyzer.creator_audit import creator_audit
         s = an.koc_scorecard(df)
-        rows = len(s)
-        report_data = s
+        audit = creator_audit(df)
+        rows = max(len(s), len(audit["channels"]))
+        # Báo cáo Creator Audit: bảng điểm (nhiều kênh) + audit từng kênh đủ >= 5 video
+        report_data = {"scorecard": s, **audit}
         xlsx_files = ["CS3_koc_scorecard.xlsx", "CS9_rising_creators.xlsx"]
         if writer and rows:
             writer.upsert_koc(s)
@@ -127,6 +135,8 @@ def _run_analyzer(command: str, file_path: str, to_supabase: bool = False,
         rows = len(res["shelf"])
         report_data = res
         xlsx_files = ["CS13_edit_kit.xlsx"]
+        if len(res.get("tag_stats", [])):
+            xlsx_files.append("CS13_hashtag_stats.xlsx")
         if len(res.get("sounds", [])):
             xlsx_files.insert(0, "CS10_sound_watchlist.xlsx")
     elif command == "moodboard":

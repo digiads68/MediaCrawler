@@ -329,6 +329,16 @@ def opportunity_map(df: pd.DataFrame) -> pd.DataFrame:
         if not hi_vol:             return "🏜 sa mạc — chưa có cầu"
         return "🔴 bão hoà — tránh"
     g["quadrant"] = g.apply(quad, axis=1)
+    # Trục thứ 3 "độ khó vào": lượng like dồn về vài creator hay trải đều (HHI).
+    from kit.analyzer.insights import concentration
+    conc = {kw: concentration(sub) for kw, sub in df.groupby("source_keyword")}
+    g["so_creator"] = g["source_keyword"].map(lambda k: conc.get(k, {}).get("creators"))
+    g["top3_pct"] = g["source_keyword"].map(
+        lambda k: round(conc[k]["top3_share"] * 100, 1) if conc.get(k) else None)
+    g["hhi"] = g["source_keyword"].map(lambda k: conc.get(k, {}).get("hhi"))
+    g["do_kho_vao"] = g["source_keyword"].map(
+        lambda k: {"Phân tán": "dễ vào", "Vừa": "vừa", "Tập trung": "khó vào"}.get(
+            conc.get(k, {}).get("label", ""), "—"))
     g = g.sort_values(["quadrant", "save_tb"], ascending=[True, False])
     _out(g, "CS6_opportunity_map.xlsx")
     return g
@@ -692,8 +702,12 @@ def sound_edit_kit(df: pd.DataFrame, top: int | None = None) -> dict:
     d["nhom_hashtag"] = d["so_hashtag"].map(lambda v: bucket_of(v, HASHTAG_COUNT_BUCKETS))
     hashtags = _group_metrics(d[d["nhom_hashtag"] != ""], "nhom_hashtag")
 
+    # liked/collected/share/comment: thẻ trong kệ tư liệu đọc các cột này — trước đây
+    # thiếu nên mọi thẻ hiện 0 like/0 save.
     cols = [c for c in ["hook_text", "format", "dang_noi_dung", "so_anh",
                         "so_hashtag", "eng_total", "nickname", "created_at",
+                        "liked_count", "collected_count", "share_count", "comment_count",
+                        "save_rate", "share_rate", "source_keyword",
                         "cover_url", "cover_url_c", "platform", "title",
                         "aweme_url", "note_url", "video_url",
                         "video_download_url", "download_url",
@@ -706,8 +720,14 @@ def sound_edit_kit(df: pd.DataFrame, top: int | None = None) -> dict:
     edit_tables = {"dang_noi_dung": kinds, "so_anh": images, "hashtag": hashtags}
     _out(pd.concat([t.assign(_bang=name) for name, t in edit_tables.items()
                     if len(t)] or [pd.DataFrame()]), "CS13_edit_kit.xlsx")
+    from kit.analyzer.insights import hashtag_stats, tag_pairs
+    tag_stats = pd.DataFrame(hashtag_stats(d))
+    pairs = pd.DataFrame(tag_pairs(d))
+    if len(tag_stats):
+        _out(tag_stats, "CS13_hashtag_stats.xlsx")
     return {"sounds": sounds, "kinds": kinds, "images": images,
-            "hashtags": hashtags, "shelf": shelf, "has_music": has_music}
+            "hashtags": hashtags, "shelf": shelf, "has_music": has_music,
+            "tag_stats": tag_stats, "tag_pairs": pairs}
 
 
 # ============================================================================

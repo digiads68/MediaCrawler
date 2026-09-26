@@ -211,6 +211,32 @@ def hashtag_stats(d: pd.DataFrame) -> list[dict[str, Any]]:
     return rows
 
 
+def tag_pairs(d: pd.DataFrame, min_posts: int = MIN_TAG_POSTS, top: int | None = None
+              ) -> list[dict[str, Any]]:
+    """Cặp hashtag hay xuất hiện cùng bài: số bài chung, like trung vị, so với cả bộ."""
+    like = _metric(d, "like")
+    if like is None or d.empty:
+        return []
+    tags = split_hashtags(d).map(
+        lambda ts: sorted({str(t).strip().lower() for t in ts if str(t).strip()
+                           and re.search(r"\w", str(t))} - SYSTEM_TAGS))
+    overall = _median(like)
+    bucket: dict[tuple[str, str], list[float]] = {}
+    for ts, lk in zip(tags, like, strict=True):
+        for i in range(len(ts)):
+            for j in range(i + 1, len(ts)):
+                bucket.setdefault((ts[i], ts[j]), []).append(float(lk))
+    rows = []
+    for (a, b), likes in bucket.items():
+        if len(likes) < min_posts:
+            continue
+        med = float(pd.Series(likes).median())
+        rows.append({"tag_a": a, "tag_b": b, "posts": len(likes), "like_median": med,
+                     "lift": round(med / overall, 2) if overall else None})
+    rows.sort(key=lambda r: (-r["posts"], -(r["lift"] or 0)))
+    return rows if top is None else rows[:top]
+
+
 def concentration(d: pd.DataFrame) -> dict[str, Any]:
     """Phần like của top 3 creator và HHI; kèm nhãn và cảnh báo mẫu nhỏ."""
     like = _metric(d, "like")

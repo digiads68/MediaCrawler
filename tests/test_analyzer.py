@@ -79,7 +79,9 @@ def test_koc_scorecard_khong_du_video(df):
 
 def test_opportunity_map_quadrant(df):
     g = an.opportunity_map(df)
-    assert set(g.columns) == {"source_keyword", "so_bai", "eng_tb", "save_tb", "quadrant"}
+    assert {"source_keyword", "so_bai", "eng_tb", "save_tb", "quadrant"} <= set(g.columns)
+    # Trục "độ khó vào" (mức tập trung creator) thêm từ 09/2026
+    assert {"so_creator", "top3_pct", "hhi", "do_kho_vao"} <= set(g.columns)
     assert len(g) == 2  # 护肤, 精华
     assert g["quadrant"].str.contains("biển xanh|cạnh tranh|sa mạc|bão hoà").all()
 

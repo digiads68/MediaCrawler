@@ -36,12 +36,12 @@ interface AnalyzeDialogProps {
 // 8 case study — nhãn tiếng Việt (tầng DigiAds hướng người dùng VN)
 const COMMANDS: { value: KitCommand; label: string; desc: string }[] = [
   { value: 'trend', label: 'Trend Radar (CS1+CS10+CS5)', desc: 'Top bài, format thắng thế, sound đang lên' },
-  { value: 'koc', label: 'KOC Scorecard (CS3+CS9)', desc: 'Chấm điểm creator, phát hiện KOC đang lên' },
+  { value: 'koc', label: 'Creator Audit (CS3+CS9)', desc: 'Soi sâu kênh: nhịp đăng, tỷ lệ hit, trụ nội dung (Creator Mode)' },
   { value: 'sov', label: 'Share of Voice (CS11)', desc: 'Thị phần tiếng nói theo brand (cần brand_map)' },
   { value: 'opportunity', label: 'Opportunity Map (CS4/CS6)', desc: 'Bản đồ ngách 4 vùng cơ hội' },
   { value: 'seasonal', label: 'Seasonal Radar (CS7)', desc: 'Đợt sóng mùa vụ theo tuần' },
   { value: 'price', label: 'Price & Promo Intel (CS8)', desc: 'Giá & mồi khuyến mãi đối thủ' },
-  { value: 'insight', label: 'Voice of Customer (CS2)', desc: 'Ngân hàng bình luận (cần file comment)' },
+  { value: 'insight', label: 'Voice of Customer (CS2)', desc: 'Bình luận + nhịp thảo luận, độ phủ mẫu (cần file comment)' },
   { value: 'angle', label: 'Angle Library (CS5)', desc: 'Xuất angle nạp pipeline AI video' },
 ]
 

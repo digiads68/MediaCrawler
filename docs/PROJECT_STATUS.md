@@ -78,6 +78,8 @@ trong n8n), 5 file `kit/templates/*.xlsx`.
 | `kit/storage` (schema/writer/checkpoint) | ✅ | ✅ `test_storage.py`, `test_checkpoint.py` | Cờ `--to supabase` | Schema **chưa deploy** lên Supabase thật nào — chỉ có SQL sẵn |
 | `kit/pipeline` | ✅ | ✅ `test_pipeline.py` | CLI + `/kit/angle-brief` | provider=claude chưa chạy thật với API key thật trong session này |
 | `kit/analyzer/insights.py` | ✅ (09/2026) | ✅ `test_insights.py` | Gọi từ `trend_radar` | Kết luận/bằng chứng Trend Radar; luật + ngưỡng ở đầu file |
+| `kit/analyzer/creator_audit.py` | ✅ (09/2026) | ✅ `test_report_phase2.py` | Lệnh `koc` | Creator Audit: soi sâu kênh, trụ nội dung, lịch đăng |
+| `kit/analyzer/conversation.py` | ✅ (09/2026) | ✅ `test_report_phase2.py` | Lệnh `insight` | Conversation Pulse: độ phủ mẫu bình luận, thời gian đến, câu hỏi |
 | `kit/report` | ✅ (làm lại 09/2026) | ✅ `test_report.py`, `test_report_full_data.py` | Gọi từ `_run_analyzer`, phục vụ qua `/kit/reports/{name}` | **Mới**: sinh báo cáo HTML tự chứa (donut/hbar/line SVG server-side, link video, palette dataviz đã validate). Đã chạy thật trên data douyin + verify UI end-to-end |
 | `kit/webhook` | ✅ | ✅ `test_webhook.py` | Cờ `--notify` | Chưa test với `NOTIFY_WEBHOOK_URL` thật (n8n) |
 | `kit/queue` (arq) | ✅ | ✅ `test_tasks.py` | CLI enqueue + worker | **Chưa chạy thật với Redis** — chỉ test bằng mock |
@@ -386,9 +388,9 @@ cáo ghi ra chỗ `api/routers/kit.py` không đọc tới.
 
 ## 6. Việc CHƯA làm — gợi ý lộ trình tiếp theo
 
-> **Ưu tiên hiện tại (đã được chủ dự án duyệt thiết kế):** report đợt 2 + 3 — Creator Audit,
-> Conversation Pulse, Structure & Hashtag Kit, Opportunity Map + mức tập trung, Momentum, LLM
-> cho ô nhận xét. Đặc tả + số liệu mẫu đã đo: **[`HANDOFF.md`](../HANDOFF.md) §6**.
+> **Ưu tiên hiện tại:** report **đợt 3** — 8 report còn lại sang bố cục 3 tầng, Momentum trong
+> Trend Radar, LLM cho ô nhận xét. Đợt 1 + 2 đã xong. Đặc tả: **[`HANDOFF.md`](../HANDOFF.md) §6**.
+> Nhánh `claude/social-media-analytics-dashboard-mto92x` đã bị chủ dự án **bỏ** — không merge.
 
 Sắp theo độ ưu tiên (dựa trên giá trị/công sức), không phải thứ tự bắt buộc:
 

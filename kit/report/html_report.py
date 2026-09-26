@@ -78,6 +78,10 @@ _COL_LABELS = {
     "tu_khoa": "Từ/cụm khách dùng", "ngu_canh": "Ngữ cảnh", "dung_o_dau": "Dùng ở đâu",
     "cau_hoi": "Câu hỏi của khách", "title_text": "Tiêu đề",
     "cover_url_c": "Ảnh cover", "so_bai_moi_creator": "Bài/creator",
+    "so_da_cao": "Đã cào", "ty_le_cau_hoi": "% câu hỏi", "questions": "Câu hỏi",
+    "top3_pct": "Top 3 chiếm %", "hhi": "HHI", "do_kho_vao": "Độ khó vào",
+    "tag_1": "Tag", "tag_2": "Đi cùng", "tag": "Tag", "posts": "Số bài", "like_median": "Like trung vị",
+    "url": "Bài",
 }
 
 # Cột văn bản dài -> cắt hiển thị (giữ nguyên tooltip đầy đủ)
@@ -96,7 +100,8 @@ _NUM_COLS = {"liked_count", "collected_count", "share_count", "comment_count",
              "phan_tram", "save_rate_median", "share_rate_median", "hook_len",
              "so_anh", "so_hashtag", "pct_rank", "eng_common", "tan_suat",
              "uu_tien", "m_like", "m_comment", "m_share", "m_save", "m_view",
-             "so_bai_moi_creator"}
+             "so_bai_moi_creator", "so_da_cao", "ty_le_cau_hoi", "questions",
+             "top3_pct", "hhi", "posts", "like_median"}
 
 
 def _esc(v: object) -> str:
@@ -633,8 +638,8 @@ def _report_hook(result: dict, df: pd.DataFrame | None) -> tuple[str, list, str]
 
 
 def _report_sound(result: dict, df: pd.DataFrame | None) -> tuple[str, list, str]:
-    """CS10+CS13 — Sound & Edit Kit (editor)."""
-    NAME = "Sound & Edit Kit"
+    """CS10+CS13 — Structure & Hashtag Kit (editor): nhạc, kết cấu bài, hashtag."""
+    NAME = "Structure & Hashtag Kit"
     XLSX = ["CS10_sound_watchlist.xlsx", "CS13_edit_kit.xlsx"]
     sounds = result.get("sounds", pd.DataFrame())
     kinds = result.get("kinds", pd.DataFrame())
@@ -711,6 +716,27 @@ def _report_sound(result: dict, df: pd.DataFrame | None) -> tuple[str, list, str
     if struct:
         body.append(_section("Kết cấu bài",
                              f'<div class="chart-grid-2">{"".join(struct)}</div>'))
+
+    tag_stats = result.get("tag_stats", pd.DataFrame())
+    pairs = result.get("tag_pairs", pd.DataFrame())
+    if tag_stats is not None and len(tag_stats):
+        chips = []
+        for _, t in tag_stats.iterrows():
+            lift = t.get("lift")
+            cls = "up" if lift and lift >= 1.2 else "down" if lift is not None and lift <= 0.6 else ""
+            chips.append(f'<span class="tchip {cls}" title="like trung vị {_fmt_vi(t["like_median"])}">'
+                         f'#{_esc(t["tag"])} <b>{int(t["posts"])}</b> · {_fmt_vi(lift, 1)}×</span>')
+        pair_html = ""
+        if pairs is not None and len(pairs):
+            pt = pairs.rename(columns={"tag_a": "tag_1", "tag_b": "tag_2", "posts": "so_bai",
+                                       "like_median": "eng_median"})
+            pair_html = '<h3 class="sub-h">Cặp tag hay đi cùng</h3>' + _table(pt)
+        body.append(_section(
+            f"Hashtag ({len(tag_stats)} tag có ≥ 2 bài)",
+            f'<div class="tchips">{"".join(chips)}</div>'
+            + _read("số đậm là số bài; “×” là like trung vị của tag so với cả bộ. "
+                    '<span class="tchip up">xanh</span> ≥ 1,2 lần, <span class="tchip down">đỏ</span> ≤ 0,6 lần. '
+                    "Tag dưới 3 bài chỉ đọc như gợi ý.") + pair_html))
 
     if shelf is not None and len(shelf):
         body.append(_section(
@@ -795,11 +821,11 @@ def _pill(text: str, tone: str) -> str:
     return f'<span class="pill pill-{tone}">{_esc(text)}</span>'
 
 
-def _verdict_block(verdict: str, decisions: list[str]) -> str:
+def _verdict_block(verdict: str, decisions: list[str], tone: str = "") -> str:
     items = "".join(f'<li><span class="dn">{i}</span><span>{_esc(t)}</span></li>'
                     for i, t in enumerate(decisions, 1))
     lst = f'<ol class="decisions">{items}</ol>' if items else ""
-    return (f'<section class="verdict"><div class="eyebrow">Kết luận</div>'
+    return (f'<section class="verdict{" verdict-" + tone if tone else ""}"><div class="eyebrow">Kết luận</div>'
             f'<p class="verdict-text">{_esc(verdict)}</p>{lst}</section>')
 
 
@@ -1021,32 +1047,254 @@ def _commentary_panel(title: str, payload: dict, auto_lines: list[str]) -> str:
 </section>"""
 
 
-def _report_koc(result: pd.DataFrame, df: pd.DataFrame | None) -> tuple[str, list, str]:
-    s = result
-    if s is None or s.empty:
-        return ('<p class="muted">Không đủ dữ liệu creator (mỗi creator cần ≥5 video).</p>',
-                [], "KOC Scorecard")
-    rising = int(s["rising"].sum())
-    ky_ngay = int((s["verdict"] == "ký ngay").sum())
-    tiles = _tiles([
-        ("Creator chấm", str(len(s)), "≥5 video"),
-        ("Đang lên", str(rising), "velocity≥1.3 & đều≥0.4"),
-        ("Điểm cao nhất", f'{s["diem_tong"].max():.0f}', "thang 0–100"),
-        ("Ký ngay", str(ky_ngay), "verdict ký ngay"),
+def _quarter_chart(quarters: list[dict]) -> str:
+    """Cột = số video mỗi quý, đường = like trung vị; quý non tuổi gạch chéo, nét đứt."""
+    if not quarters:
+        return '<p class="muted">Không có dữ liệu thời gian.</p>'
+    W, H, L, R, T, B = 560, 240, 38, 52, 16, 36
+    n = len(quarters)
+    bw = (W - L - R) / n
+    vmax = max(q["videos"] for q in quarters) or 1
+    lmax = max((q["like_median"] or 0) for q in quarters) or 1
+    y_v = lambda v: T + (1 - v / vmax) * (H - T - B)  # noqa: E731
+    y_l = lambda v: T + (1 - v / lmax) * (H - T - B)  # noqa: E731
+    parts = [f'<svg viewBox="0 0 {W} {H}" class="qchart" role="img" '
+             f'aria-label="Số video và like trung vị theo quý" style="width:100%;height:auto">',
+             '<defs><pattern id="qhatch" width="6" height="6" patternUnits="userSpaceOnUse" '
+             'patternTransform="rotate(45)"><rect width="6" height="6" fill="var(--surface-2)"/>'
+             '<line x1="0" y1="0" x2="0" y2="6" stroke="var(--muted)" stroke-width="1.5"/></pattern></defs>']
+    for frac in (0, 0.5, 1):
+        y = y_v(vmax * frac)
+        parts.append(f'<line x1="{L}" x2="{W - R}" y1="{y:.1f}" y2="{y:.1f}" stroke="var(--rule)"/>'
+                     f'<text x="{L - 5}" y="{y + 4:.1f}" text-anchor="end" class="ax">{round(vmax * frac)}</text>'
+                     f'<text x="{W - R + 5}" y="{y_l(lmax * frac) + 4:.1f}" class="ax" fill="var(--accent)">'
+                     f'{_fmt_vi(lmax * frac / 1000, 0)}K</text>')
+    pts = []
+    step = max(1, n // 8)
+    for i, q in enumerate(quarters):
+        x = L + i * bw + bw * 0.15
+        w = bw * 0.7
+        fill = "url(#qhatch)" if q["young"] else "var(--surface-2)"
+        parts.append(f'<rect x="{x:.1f}" y="{y_v(q["videos"]):.1f}" width="{w:.1f}" '
+                     f'height="{y_v(0) - y_v(q["videos"]):.1f}" rx="2" fill="{fill}" '
+                     f'stroke="var(--muted)" stroke-width=".8"><title>{_esc(q["quarter"])}: '
+                     f'{q["videos"]} video · like trung vị {_fmt_vi(q["like_median"])}</title></rect>')
+        if i % step == 0 or i == n - 1:
+            parts.append(f'<text x="{x + w / 2:.1f}" y="{H - B + 14}" text-anchor="middle" '
+                         f'class="ax">{_esc(q["quarter"])}</text>')
+        if q["like_median"] is not None:
+            pts.append((x + w / 2, y_l(q["like_median"]), q["young"]))
+    solid = [p for p in pts if not p[2]]
+    if len(solid) >= 2:
+        parts.append('<polyline fill="none" stroke="var(--accent)" stroke-width="2.2" points="'
+                     + " ".join(f"{x:.1f},{y:.1f}" for x, y, _ in solid) + '"/>')
+    for x, y, young in pts:
+        parts.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="3.2" fill="{"var(--muted)" if young else "var(--accent)"}"/>')
+    parts.append("</svg>")
+    return "".join(parts)
+
+
+def _pillar_table(pillars: list[dict]) -> str:
+    if not pillars:
+        return '<p class="muted">Chưa có hashtag nào đủ 6 video để coi là trụ nội dung.</p>'
+    rows = []
+    for p in pillars:
+        tone = "good" if p["recommend"] == "Làm thêm" else "bad" if p["recommend"] == "Giảm" else "neutral"
+        cls = "fill-good" if tone == "good" else "fill-bad" if tone == "bad" else "fill-like"
+        w = min(p["lift"] / 2.5, 1) * 100
+        few = ' <span class="pill pill-warn">ít video</span>' if p.get("few") else ""
+        rows.append(
+            f'<tr><td class="zh">#{_esc(p["tag"])}</td><td class="num">{p["videos"]}</td>'
+            f'<td class="num">{_fmt_vi(p["like_median"])}</td>'
+            f'<td><div class="lift"><span class="hb-track lift-track"><span class="hb-fill {cls}" '
+            f'style="width:{w:.0f}%"></span><span class="lift-mark" title="= trung vị kênh"></span></span>'
+            f'<span class="num">{_fmt_vi(p["lift"], 2)} lần</span></div></td>'
+            f'<td class="num">{p["hit_rate"] * 100:.0f}%</td><td>{_pill(p["recommend"], tone)}{few}</td></tr>')
+    return ('<div class="tbl-wrap"><table><thead><tr><th>Chủ đề</th><th class="num">Video</th>'
+            '<th class="num">Like trung vị</th><th>So với trung vị kênh</th><th class="num">Tỷ lệ hit</th>'
+            f'<th>Khuyến nghị</th></tr></thead><tbody>{"".join(rows)}</tbody></table></div>')
+
+
+def _channel_section(a: dict, posts: pd.DataFrame, idx: int, with_commentary: bool) -> str:
+    sched = a.get("schedule") or {}
+    top10 = a.get("top10_share")
+    kpis = _kpi_tiles([
+        ("Video", _fmt_vi(a["videos"]), f'{a.get("first", "")} → {a.get("last", "")}', ""),
+        ("Like trung vị", _fmt_vi(a["like_median"]), "video ≥ 30 ngày tuổi", ""),
+        ("Tỷ lệ hit", f'{(a.get("hit_rate") or 0) * 100:.0f}%',
+         f'≥ 2 lần trung vị · {a.get("mega_hits", 0)} video ≥ 10 lần', ""),
+        ("10% video top", f'{(top10 or 0) * 100:.0f}%', "tổng like",
+         _pill("Phụ thuộc hit", "warn") if top10 and top10 >= 0.5 else _pill("Khá đều", "good")),
+        ("Nhịp đăng", f'{_fmt_vi(sched.get("gap_median_days"), 1)} ngày',
+         (f'đăng lúc {sched["top_hour"]}:00 ({sched["top_hour_share"] * 100:.0f}% video)'
+          if sched.get("top_hour") is not None else ""),
+         _pill("Lịch cố định", "neutral") if sched.get("fixed") else ""),
     ])
-    verdict_counts = s["verdict"].value_counts()
-    donut = charts.donut([(str(k), float(v)) for k, v in verdict_counts.items()],
-                         title="Cơ cấu kết luận", unit="creator")
-    top10 = s.head(10)
-    label_col = "nickname" if s["nickname"].astype(str).str.len().gt(0).any() else "creator"
-    bar = charts.hbar([(str(r[label_col])[:16], float(r["diem_tong"]))
-                       for _, r in top10.iterrows()],
-                      title="Top creator theo điểm", color_idx=1)
-    body = [tiles,
-            _section("Tổng quan", f'<div class="chart-grid-2">{donut}{bar}</div>'),
-            _section("Bảng chấm điểm KOC (creator đang lên = ▲)",
-                     _table(s, max_rows=40, drop=("creator",)))]
-    return "".join(body), ["CS3_koc_scorecard.xlsx", "CS9_rising_creators.xlsx"], "KOC Scorecard"
+    body = [_verdict_block(a.get("verdict", ""), a.get("decisions", [])), kpis]
+    if with_commentary:
+        body.append("<!--COMMENTARY-->")
+    body.append('<div class="tier">Bằng chứng</div>')
+    buckets = a.get("buckets") or []
+    colors = ["fill-bad", "fill-like", "fill-like", "fill-good", "fill-good"]
+    top_b = max((b["videos"] for b in buckets), default=1) or 1
+    hb = "".join(
+        f'<div class="hb-row"><span class="hb-label">{_esc(b["label"])}</span><span class="hb-track">'
+        f'<span class="hb-fill {colors[i]}" style="width:{b["videos"] / top_b * 100:.0f}%"></span></span>'
+        f'<span class="hb-val">{b["videos"]}</span></div>' for i, b in enumerate(buckets))
+    below = sum(b["videos"] for b in buckets[:2])
+    hits = sum(b["videos"] for b in buckets[3:])
+    body.append(
+        '<div class="chart-grid-2 ev-grid">'
+        f'<section class="panel"><h2>Số video và like trung vị theo quý</h2>{_quarter_chart(a.get("quarters") or [])}'
+        '<div class="legend"><span><i class="lg-dot" style="background:var(--surface-2);border:1px solid var(--muted)"></i>'
+        'Số video</span><span><i class="lg-dot" style="background:var(--accent)"></i>Like trung vị</span>'
+        '<span>Gạch chéo: quý có hơn nửa video dưới 30 ngày tuổi</span></div>'
+        + _read("cột là số video đăng trong quý, đường là like trung vị mỗi video (chỉ tính video ≥ 30 ngày "
+                "tuổi). Cột cao mà đường không lên nghĩa là đăng nhiều hơn chưa làm mỗi video ăn hơn.")
+        + '</section>'
+        f'<section class="panel"><h2>Phân bố hiệu suất so với trung vị kênh</h2>{hb}'
+        + _read(f"{below}/{a['videos']} video dưới mức trung vị, {hits} video vượt 2 lần. Nhìn vào nhóm "
+                "≥ 2 lần để tìm công thức lặp lại được.")
+        + "</section></div>")
+    body.append(_section("Trụ nội dung (hashtag có ≥ 6 video)",
+                         _pillar_table(a.get("pillars") or [])
+                         + '<p class="muted">Đã bỏ tag của nền tảng và tag có ở hơn 80% video (tag chung, '
+                           'không phân biệt được chủ đề). Chủ đề dưới 10 video chỉ đọc như gợi ý.</p>'))
+    dow = sched.get("dow") or []
+    top_d = max((d["like_median"] or 0 for d in dow), default=1) or 1
+    dow_rows = "".join(
+        f'<div class="hb-row"><span class="hb-label">{_esc(d["day"])} ({d["videos"]})</span><span class="hb-track">'
+        f'<span class="hb-fill fill-like" style="width:{(d["like_median"] or 0) / top_d * 100:.0f}%"></span></span>'
+        f'<span class="hb-val">{_fmt_vi(d["like_median"])}</span></div>' for d in dow)
+    note = ("Kênh đăng gần như cùng một giờ nên không so được giờ tốt, giờ xấu. " if sched.get("fixed") else "")
+    note += "Số trong ngoặc là số video; ngày ít video chỉ đọc như gợi ý."
+    goals = a.get("goals") or {}
+    goal_html = _goal_stack({g: {"label": GOAL_LABELS.get(g, g), "posts": n, "like_median": None}
+                             for g, n in goals.items()}) if goals else ""
+    body.append('<div class="chart-grid-2 ev-grid">'
+                f'<section class="panel"><h2>Lịch đăng: like trung vị theo thứ</h2>{dow_rows}{_read(_esc(note))}</section>'
+                f'<section class="panel"><h2>Mục tiêu nội dung của video</h2>{goal_html}'
+                + _read("mỗi video xếp vào nhóm có tỷ lệ lưu, bình luận hoặc chia sẻ trên mỗi like vượt 1,5 lần "
+                        "trung vị của kênh.") + '</section></div>')
+    body.append('<div class="tier">Dữ liệu đầy đủ</div>')
+    body.append(_section(f"Tất cả {len(posts)} video của kênh",
+                         _media_grid(posts, grid_id=f"ch{idx}")))
+    return "".join(body)
+
+
+def _report_koc(result: Any, df: pd.DataFrame | None) -> tuple[str, list, str]:
+    """Creator Audit: 1 kênh -> soi sâu; nhiều kênh -> bảng điểm KOC + chọn kênh để xem sâu."""
+    NAME = "Creator Audit"
+    XLSX = ["CS3_koc_scorecard.xlsx", "CS9_rising_creators.xlsx"]
+    if isinstance(result, pd.DataFrame):          # tương thích nơi gọi cũ (chỉ có bảng điểm)
+        result = {"scorecard": result, "channels": [], "posts": pd.DataFrame(), "mode": "multi"}
+    s = result.get("scorecard", pd.DataFrame())
+    channels = result.get("channels") or []
+    posts = result.get("posts", pd.DataFrame())
+    if not channels and (s is None or s.empty):
+        return ('<p class="muted">Không đủ dữ liệu creator (mỗi creator cần ≥ 5 video). '
+                'Dùng Creator Mode để cào kênh.</p>', XLSX, NAME)
+    key = "creator_hash" if "creator_hash" in posts.columns else "nickname"
+
+    def posts_of(a: dict) -> pd.DataFrame:
+        return posts[posts[key].astype(str) == a["creator"]] if len(posts) and key in posts else posts
+
+    if len(channels) == 1:
+        return _channel_section(channels[0], posts_of(channels[0]), 0, True), XLSX, NAME
+
+    body = []
+    rising = int(s["rising"].sum()) if len(s) else 0
+    body.append(_verdict_block(
+        f"{len(channels)} kênh đủ ≥ 5 video · {rising} kênh đang lên (velocity ≥ 1,3 và đủ đều).",
+        [f"Xem sâu từng kênh ở ô chọn bên dưới; kênh điểm cao nhất: {s.iloc[0]['nickname']}."]
+        if len(s) else []))
+    body.append("<!--COMMENTARY-->")
+    if len(s):
+        verdict_counts = s["verdict"].value_counts()
+        donut = charts.donut([(str(k), float(v)) for k, v in verdict_counts.items()],
+                             title="Cơ cấu kết luận", unit="creator")
+        label_col = "nickname" if s["nickname"].astype(str).str.len().gt(0).any() else "creator"
+        bar = charts.hbar([(str(r[label_col])[:16], float(r["diem_tong"])) for _, r in s.head(10).iterrows()],
+                          title="Top creator theo điểm", color_idx=1)
+        body.append(_section("Bảng điểm KOC", f'<div class="chart-grid-2">{donut}{bar}</div>'
+                             + _table(s, drop=("creator",))))
+    opts = "".join(f'<option value="{i}">{_esc(a["nickname"] or a["creator"])} · {a["videos"]} video</option>'
+                   for i, a in enumerate(channels))
+    body.append(f'<section class="panel"><h2>Xem sâu một kênh</h2><select id="ch-sel" class="mg-sort" '
+                f'aria-label="Chọn kênh">{opts}</select></section>')
+    for i, a in enumerate(channels):
+        body.append(f'<div class="ch-audit" data-ch="{i}"{"" if i == 0 else " hidden"}>'
+                    f'{_channel_section(a, posts_of(a), i, False)}</div>')
+    body.append('<script>(function(){var s=document.getElementById("ch-sel");if(!s)return;'
+                's.addEventListener("change",function(){Array.prototype.forEach.call('
+                'document.querySelectorAll(".ch-audit"),function(el){el.hidden=el.getAttribute("data-ch")!==s.value;});});})();</script>')
+    return "".join(body), XLSX, NAME
+
+
+def _report_insight(result: Any, df: pd.DataFrame | None) -> tuple[str, list, str]:
+    """Voice of Customer + Conversation Pulse."""
+    NAME = "Voice of Customer"
+    XLSX = ["CS2_comment_bank.xlsx"]
+    if isinstance(result, pd.DataFrame):          # tương thích nơi gọi cũ
+        result = {"bank": result, "pulse": {}}
+    bank = result.get("bank", pd.DataFrame())
+    o = result.get("pulse") or {}
+    body = []
+    if o:
+        low = o.get("low_coverage")
+        body.append(_verdict_block(o.get("verdict", ""), o.get("decisions", []),
+                                   tone="warn" if low else ""))
+        lag = o.get("lag_hours") or {}
+        cov = o.get("coverage")
+        cov_txt = ("—" if cov is None else f"{cov * 100:.1f}%".replace(".", ",") if cov < 0.01
+                   else f"{cov * 100:.0f}%")
+        body.append(_kpi_tiles([
+            ("Bình luận đã cào", _fmt_vi(o["comments"]),
+             f'{_fmt_vi(o["posts"])} bài · trung vị {_fmt_vi(o["per_post_median"])}/bài', ""),
+            ("Độ phủ", cov_txt, "so với số bình luận thật" if cov is not None else "cần file bài cùng phiên",
+             _pill("Mẫu nhỏ", "bad") if low else (_pill("Đủ đọc xu hướng", "good") if cov is not None else "")),
+            ("Đến sau khi đăng", f'{_fmt_vi(lag.get("p50"), 1)} giờ' if lag else "—",
+             f'trung vị · 75% trong {_fmt_vi((lag.get("p75") or 0) / 24, 0)} ngày' if lag else "cần file bài", ""),
+            ("Là câu hỏi", f'{(o.get("question_share") or 0) * 100:.0f}%', "có ? / 吗 / 怎么 / 为什么…", ""),
+            ("Có trả lời", f'{(o.get("root_with_replies") or 0) * 100:.0f}%' if o.get("root_with_replies") is not None else "—",
+             "bình luận gốc có trả lời" + (" · chưa cào phần trả lời" if not o.get("replies_crawled") else ""), ""),
+        ]))
+    body.append("<!--COMMENTARY-->")
+    if o:
+        body.append('<div class="tier">Bằng chứng</div>')
+        if o.get("lag_hours"):
+            lag = o["lag_hours"]
+            rows = [("25% đến trước", lag["p25"]), ("Một nửa đến trước", lag["p50"]),
+                    ("75% đến trước", lag["p75"]), ("90% đến trước", lag["p90"])]
+            bars = _bar_rows([(k, v, f"{_fmt_vi(v, 1)} giờ" if v < 48 else f"{_fmt_vi(v / 24, 0)} ngày")
+                              for k, v in rows], color_class="fill-comment")
+            body.append(_section("Bình luận đến nhanh hay chậm", bars + _read(
+                "thời gian từ lúc đăng bài đến lúc có bình luận, tính trên mẫu đã cào. Crawler lấy bình luận "
+                "nổi bật nên mẫu nghiêng về bình luận sớm.")))
+        tp = o.get("top_posts")
+        if isinstance(tp, pd.DataFrame) and len(tp):
+            t = tp.rename(columns={"_real": "comment_count", "crawled": "so_da_cao",
+                                   "comment_likes": "like_count", "question_share": "ty_le_cau_hoi"})
+            t["ty_le_cau_hoi"] = (t["ty_le_cau_hoi"] * 100).round(0)
+            keep = [c for c in ("title", "url", "comment_count", "so_da_cao", "like_count",
+                                "questions", "ty_le_cau_hoi") if c in t.columns]
+            body.append(_section("Bài kéo thảo luận (xếp theo tổng like của bình luận)", _table(t[keep])))
+        qs = o.get("questions")
+        if isinstance(qs, pd.DataFrame) and len(qs):
+            body.append(_section(f"Câu hỏi của khách ({len(qs)} câu) — ý tưởng cho video tiếp theo",
+                                 _table(qs.drop(columns=[c for c in ("post_id",) if c in qs.columns]))))
+    body.append('<div class="tier">Dữ liệu đầy đủ</div>')
+    if bank is not None and len(bank):
+        col = "like_count" if "like_count" in bank.columns else None
+        if col:
+            top = bank.nlargest(8, col)
+            body.append(_section("Bình luận nổi bật", charts.hbar(
+                [(str(r["content"])[:28], float(r[col])) for _, r in top.iterrows()],
+                title="Theo like", color_idx=3)))
+        body.append(_section(f"Ngân hàng bình luận ({len(bank)} bình luận đã lọc, xếp theo like)", _table(bank)))
+    else:
+        body.append('<p class="muted">Không có bình luận nào qua bộ lọc.</p>')
+    return "".join(body), XLSX, NAME
 
 
 def _report_sov(result: pd.DataFrame, df: pd.DataFrame | None) -> tuple[str, list, str]:
@@ -1099,6 +1347,9 @@ def _report_generic(command: str, result: pd.DataFrame,
         tiles_items = [("Từ khoá", str(len(result)), "ngách khảo sát"),
                        ("Biển xanh", str(int(vc.get("🌊 biển xanh — đánh ngay", 0))), "đánh ngay"),
                        ("Bão hoà", str(int(vc.get("🔴 bão hoà — tránh", 0))), "nên tránh")]
+        if "do_kho_vao" in result.columns:
+            hard = int((result["do_kho_vao"] == "khó vào").sum())
+            tiles_items.append(("Ngách khó vào", str(hard), "top 3 creator giữ phần lớn like"))
         chart = charts.hbar([(str(r["source_keyword"])[:16], float(r["save_tb"]))
                              for _, r in result.head(12).iterrows()],
                             title="Save TB theo từ khoá", color_idx=5)
@@ -1142,6 +1393,7 @@ def _report_generic(command: str, result: pd.DataFrame,
 
 
 _RICH = {"trend": _report_trend, "koc": _report_koc, "sov": _report_sov,
+         "insight": _report_insight,
          "playbook": _report_playbook, "hook": _report_hook,
          "sound": _report_sound, "moodboard": _report_moodboard}
 
@@ -1383,6 +1635,12 @@ body{background:var(--page);color:var(--ink);font-family:var(--font);
 .read{margin:12px 0 0;font-size:12.5px;color:var(--ink-2);background:var(--surface-2);border-radius:8px;padding:8px 11px}
 .read b{color:var(--ink)}
 .ev-grid{align-items:stretch}
+.verdict-warn{background:var(--warn-bg)}
+.fill-good{background:var(--good)}.fill-bad{background:var(--bad)}.fill-comment{background:var(--m-comment)}
+.lift{display:flex;align-items:center;gap:8px;min-width:190px}
+.lift-track{position:relative;flex:1;overflow:visible}
+.lift-mark{position:absolute;left:40%;top:-3px;bottom:-3px;width:2px;background:var(--ink)}
+.qchart{max-width:100%}
 .age-cols{display:grid;grid-template-columns:1fr;gap:6px}
 /* Cơ cấu mục tiêu nội dung */
 .stack{display:flex;height:28px;border-radius:7px;overflow:hidden}

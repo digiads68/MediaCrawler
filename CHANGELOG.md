@@ -1,5 +1,17 @@
 # CHANGELOG
 
+## Report đợt 2 — 2026-09-25
+
+- **Creator Audit** (thay KOC Scorecard, lệnh `koc`): 1 kênh → soi sâu nhịp đăng, quỹ đạo theo quý
+  (loại video < 30 ngày tuổi), tỷ lệ hit, trụ nội dung (Làm thêm / Giữ / Giảm), lịch đăng, lưới thẻ
+  đủ video; nhiều kênh → bảng điểm KOC + chọn kênh để xem sâu. `kit/analyzer/creator_audit.py`.
+- **Conversation Pulse** trong Voice of Customer: độ phủ mẫu bình luận (tự ghép file bài cùng
+  phiên), thời gian bình luận đến, bài kéo thảo luận, câu hỏi của khách. `kit/analyzer/conversation.py`.
+- **Structure & Hashtag Kit** (đổi tên Sound & Edit Kit): bảng hashtag + cặp tag hay đi cùng.
+  Fix kệ tư liệu hiện 0 like.
+- **Opportunity Map**: thêm trục "độ khó vào" (số creator, top 3 chiếm %, HHI).
+- Bỏ nhánh `claude/social-media-analytics-dashboard-mto92x` theo quyết định chủ dự án.
+
 ## Report đợt 1 — 2026-09-25
 
 - **Trend Radar làm lại:** khung Kết luận + 3 việc nên làm, KPI có chip trạng thái, bằng

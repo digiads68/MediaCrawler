@@ -100,6 +100,11 @@ Sửa đường dẫn `executeCommand` cho khớp máy chủ (mặc định `/op
   (giữ preview, ▶ Xem, ⬇ Tải, Copy hook; lọc thêm theo từ khoá, mục tiêu, tuổi bài).
   Luật và ngưỡng nằm ở đầu `analyzer/insights.py`.
 - **Điểm trend** là thứ hạng phần trăm (lưu 40 · chia sẻ 30 · bình luận 20 · like 10).
+- **Creator Audit** (`koc`, dùng file Creator Mode): 1 kênh thì soi sâu; nhiều kênh thì bảng điểm +
+  ô chọn kênh. Ngưỡng ở đầu `analyzer/creator_audit.py`.
+- **Voice of Customer** (`insight`, file bình luận): đặt file `*_contents_X` cùng thư mục với
+  `*_comments_X` để có độ phủ mẫu và thời gian bình luận đến.
+- **Structure & Hashtag Kit** (`sound`): hashtag + cặp tag. **Opportunity Map**: cột "độ khó vào".
 - **Ô "Nhận xét tổng quan"** có ở mọi report: ghi chú lưu trên trình duyệt, nút copy prompt +
   dữ liệu cho ChatGPT. Dữ liệu tóm tắt gắn sẵn trong `<script id="report-summary">`;
   khối `#llm-commentary` để dành cho bước tự động gọi LLM sau này.

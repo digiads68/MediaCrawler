@@ -19,7 +19,8 @@
 | Launcher `.bat` + xung đột cổng với app khác trên máy | ✅ xong | §3 |
 | **Report đợt 1** (Trend Radar mới, hiện đủ dữ liệu, ô nhận xét, giao diện mới) | ✅ xong | §4 |
 | 3 lỗi dữ liệu có từ trước (JSON mất ngày, bình luận mất 90%, điểm trend) | ✅ xong | §5 |
-| **Report đợt 2 + 3** (Creator Audit, Conversation Pulse, Hashtag, Momentum) | ⏳ đã duyệt thiết kế, CHƯA code | §6 |
+| **Report đợt 2** (Creator Audit, Conversation Pulse, Hashtag, Opportunity + độ khó vào) | ✅ xong | §6 |
+| **Report đợt 3** (8 report còn lại sang bố cục 3 tầng, Momentum) | ⏳ đã duyệt thiết kế, CHƯA code | §6 |
 | Nhận xét report bằng LLM tự động | ⏳ tính năng sau, đã chừa chỗ | §4.4 |
 
 Bản thiết kế report đã được chủ dự án duyệt (có form mẫu chạy bằng dữ liệu thật):
@@ -189,30 +190,38 @@ bên cạnh report; JS trong `_JS` fetch file đó nếu có. **Không** gửi d
    Voice of Customer: 273 → **2.330** bình luận dùng được.
 3. **Điểm trend bị 1 bài viral ép về ~0** — đổi sang thứ hạng % (§4.2).
 
-## 6. Việc tiếp theo (đã duyệt thiết kế, CHƯA code)
+## 6. Report đợt 2 (xong) và việc tiếp theo
 
 Làm theo đúng khung đợt 1 (3 tầng, token màu, `_media_grid`/`_table` đủ dữ liệu, ô nhận xét).
 
-### Đợt 2
-1. **Creator Audit** — làm lại `koc` (`_report_koc`, `koc_scorecard`). Hai chế độ:
-   - **1 kênh** (creator mode 1 creator): nhịp đăng (khoảng cách trung vị), số video + like
-     trung vị theo quý (**loại video < 30 ngày tuổi** khi so, quý cuối gạch chéo "non tuổi"),
-     phân bố hiệu suất theo bội số trung vị kênh (<0,5 · 0,5–1 · 1–2 · 2–10 · ≥10), tỷ lệ hit
-     (≥2 lần), phần like của 10% video top, **trụ nội dung** = hashtag ≥6 video với mức so trung
-     vị kênh + tỷ lệ hit + khuyến nghị Làm thêm/Giữ/Giảm (bỏ tag nền tảng và tag có ở >80% video),
-     lịch đăng theo giờ/thứ **của chính kênh**, mục tiêu nội dung, lưới thẻ đủ video.
-   - **Nhiều kênh**: bảng điểm KOC như hiện nay + drilldown từng kênh.
-   - Số liệu mẫu đã đo (file 246 video, kênh phim tài liệu động vật): trung vị like 25.026
-     (video ≥30 ngày), hit 26%, 10% video top = 59% like, Q2/2026 đăng 42 video (gấp ~2,5 lần)
-     nhưng like trung vị không tăng, #虎鲸 ×2,45 (hit 71%), #非洲 ×0,44, 93% video đăng lúc 8:00.
-2. **Conversation Pulse** — thêm vào `insight` (Voice of Customer): bình luận/bài, **độ phủ**
-   (số đã cào ÷ `comment_count` của bài; mẫu hiện ~3%), thời gian từ lúc đăng đến bình luận
-   (trung vị 2,2 giờ), tỷ lệ câu hỏi (`?`/吗/怎么/为什么: 19%), bình luận có ảnh (8%), tỷ lệ bình
-   luận gốc có trả lời (65% — nhưng chưa cào phần trả lời). **Phải hiện độ phủ ở đầu trang.**
-   Cần ghép file contents cùng phiên để có `create_time` bài và `comment_count` thật.
-3. **Structure & Hashtag Kit** — đổi tên `sound` (Sound & Edit Kit) và gộp Hashtag
-   Constellation: bảng tag + mức so cả bộ + **cặp tag hay đi cùng**.
-4. **Opportunity Map** + cột mức tập trung (HHI, top 3) làm trục "độ khó vào".
+### Đợt 2 — đã xong (phiên 25/09/2026, sau commit `cd06b12`)
+1. **Creator Audit** (lệnh `koc`) — `kit/analyzer/creator_audit.py` (mới) + `_report_koc`.
+   - `creator_audit(df)` audit mọi creator ≥ 5 video: nhịp đăng, quý (video < 30 ngày tuổi bị
+     loại khi so; quý hơn nửa video non tuổi thì gạch chéo), phân bố bội số trung vị, hit (≥2 lần),
+     10% video top, **trụ nội dung** (hashtag ≥ 6 video, bỏ tag nền tảng và tag có ở > 80% video,
+     Làm thêm ≥ 1,2 · Giảm < 0,8, "ít video" < 10), lịch đăng giờ/thứ theo giờ Trung Quốc, mục tiêu
+     nội dung, kết luận + ≤ 3 việc (luật "đăng dày hơn không ăn hơn" xét 2 quý gần nhất).
+   - Report: 1 kênh → soi sâu; nhiều kênh → bảng điểm KOC cũ + ô chọn kênh (`#ch-sel`) để xem sâu.
+     `koc_scorecard` giữ nguyên (Supabase `upsert_koc`, webhook rising KOC vẫn dùng).
+   - `tasks.py` lệnh `koc`: `report_data = {"scorecard": s, **creator_audit(df)}`. `_report_koc`
+     vẫn nhận DataFrame cũ (tương thích).
+   - Chạy thật file 246 video: khớp số thiết kế (25.026 · hit 26% · 59% · #虎鲸 ×2,45 · #非洲 ×0,44 ·
+     Q2/2026 42 video ×2,8 không ăn hơn · 8:00).
+2. **Conversation Pulse** (lệnh `insight`) — `kit/analyzer/conversation.py` (mới) + `_report_insight`.
+   - Tự tìm file bài cùng phiên (`sibling_contents_file`: `*_comments_X` → `*_contents_X`) để tính
+     **độ phủ** và thời gian bình luận đến. Không có file bài thì bỏ hai chỉ số đó, report ghi rõ.
+   - Bình luận gốc: dy/bili/xhs ghi `parent_comment_id="0"`, **Weibo ghi chính id của nó**.
+   - Report: khung kết luận màu cảnh báo khi độ phủ < 20%, KPI, thời gian đến, bảng bài kéo thảo
+     luận, bảng câu hỏi của khách, ngân hàng bình luận đủ dòng.
+   - Đo thật Douyin creator: 3.588 bình luận / 362 bài, độ phủ ~3%, trung vị 2,7 giờ, 20% câu hỏi.
+3. **Structure & Hashtag Kit** (lệnh `sound`, đổi tên hiển thị) — `sound_edit_kit` trả thêm
+   `tag_stats`, `tag_pairs` (`insights.tag_pairs`), Excel `CS13_hashtag_stats.xlsx`. Sửa luôn lỗi
+   kệ tư liệu thiếu cột like/lưu/chia sẻ/bình luận (thẻ hiện 0).
+4. **Opportunity Map** — thêm cột `so_creator`, `top3_pct`, `hhi`, `do_kho_vao` (dễ vào / vừa /
+   khó vào; 1–2 creator thì bỏ trống) + ô KPI "Ngách khó vào".
+5. Registry + WebUI `AnalyzeDialog`: tên mới "Creator Audit", "Structure & Hashtag Kit".
+6. Test: `tests/test_report_phase2.py` (10 test). `test_analyzer.py::test_opportunity_map_quadrant`
+   đổi từ "đúng bằng" sang "chứa" danh sách cột.
 
 ### Đợt 3
 5. 8 report còn lại (hook, playbook, moodboard, seasonal, price, sov, angle, crossplatform)
@@ -223,18 +232,13 @@ Làm theo đúng khung đợt 1 (3 tầng, token màu, `_media_grid`/`_table` đ
 7. Tính năng LLM cho ô nhận xét (§4.4).
 8. Kiểm tra phân trang của các nền tảng khác (mới sửa Douyin — xhs/bili/ks/wb chưa rà).
 
-### ⚠️ Nhánh chưa merge trùng phạm vi đợt 2 — ĐỌC TRƯỚC KHI CODE
-Trên GitHub có nhánh **`claude/social-media-analytics-dashboard-mto92x`** (2 commit, 25/07/2026,
-một phiên Claude khác): `kit/dashboard/` (`metrics.py`, `components.py`, `theme.py`,
-`profiles/{search,creator,video,overview}.py`), `kit/n8n/WF_MC4_content_action.json`,
-`tests/test_dashboard.py` — ~4.200 dòng, "tách dashboard thành 4 loại chuyên sâu theo mode cào".
-Chưa merge vào `main`, chưa được đối chiếu với report đợt 1. **Hỏi chủ dự án** trước khi làm đợt 2:
-merge nhánh đó rồi xây Creator Audit trên `profiles/creator.py`, hay bỏ nhánh đó và làm theo §6.
-Không tự merge — nhánh rẽ từ trước đợt đồng bộ upstream và trước report đợt 1, sẽ xung đột.
+### Nhánh `claude/social-media-analytics-dashboard-mto92x` — ĐÃ BỎ (quyết định của chủ dự án)
+Nhánh này (2 commit 25/07/2026, `kit/dashboard/` ~4.200 dòng, dashboard theo mode cào) **không
+dùng**. Chủ dự án chọn làm theo thiết kế mới trên code `main` (report đợt 1 + 2 ở trên), vì bản đó
+đang chạy đúng. **Đừng merge hay lấy code từ nhánh đó.** Nhánh vẫn còn trên GitHub (chưa xoá);
+xoá hay giữ là việc của chủ dự án.
 
 ### Chưa quyết (hỏi chủ dự án)
-- Đồng bộ lại `kit/analyzer/registry.py` + `capabilities.py` + WebUI `AnalyzeDialog` khi đổi
-  tên / gộp report ở đợt 2.
 - Ngưỡng `SAVE_LEVELS` trong `insights.py` là mốc tạm từ ít dữ liệu — chỉnh khi đủ nhiều từ khoá.
 
 ## 7. "Hố" gặp trong phiên này
